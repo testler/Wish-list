@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Josh's Wishlist</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Profile Banner -->
+        <header class="profile-banner">
+            <div class="profile-content">
+                <div class="profile-info">
+                    <div class="avatar-shield">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M12 2L3 7L12 12L21 7L12 2Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M3 17L12 22L21 17" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            <path d="M3 12L12 17L21 12" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                        </svg>
+                    </div>
+                    <div class="profile-text">
+                        <h1>Josh's Wishlist</h1>
+                        <p>Curated collection of wanted items</p>
+                    </div>
+                </div>
+                <button class="explore-btn">
+                    <span>🔍</span>
+                    Explore by Interests
+                </button>
+            </div>
+        </header>
+
+        <!-- Controls -->
+        <div class="controls-section">
+            <div class="sort-controls">
+                <label for="sort-select">Sort by:</label>
+                <select id="sort-select" class="sort-dropdown">
+                    <option value="most-wanted">Most Wanted</option>
+                    <option value="price-low">Price: Low to High</option>
+                    <option value="price-high">Price: High to Low</option>
+                    <option value="category">Category</option>
+                    <option value="recently-added">Recently Added</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Loading State -->
+        <div id="loading" class="loading-state">
+            <div class="loading-spinner"></div>
+            <p>Loading wishlist items...</p>
+        </div>
+
+        <!-- Error State -->
+        <div id="error" class="error-state" style="display: none;">
+            <p>Failed to load wishlist. Please try again later.</p>
+            <button onclick="loadWishlist()" class="retry-btn">Retry</button>
+        </div>
+
+        <!-- Wishlist Container -->
+        <main id="wishlist" class="wishlist-container">
+            <!-- Items will be rendered here by JavaScript -->
+        </main>
+    </div>
+
+    <!-- Explore by Interests Modal -->
+    <div id="explore-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>🔍 Explore by Interests</h2>
+                <button class="modal-close" onclick="closeExploreModal()">&times;</button>
+            </div>
+            
+            <div class="interest-filters">
+                <button class="interest-filter active" data-category="all">All Items</button>
+                <button class="interest-filter" data-category="Tesla Upgrades">🚗 Tesla</button>
+                <button class="interest-filter" data-category="3D Printing Gear">🖨️ 3D Printing</button>
+                <button class="interest-filter" data-category="Gaming & Couch Setup">🎮 Gaming</button>
+                <button class="interest-filter" data-category="Garden & Orchard Tools">🌱 Garden</button>
+                <button class="interest-filter" data-category="Home Automation">🏠 Smart Home</button>
+                <button class="interest-filter" data-category="Tech & Electronics">💻 Tech</button>
+                <button class="interest-filter" data-category="Kitchen & Cooking">☕ Kitchen</button>
+            </div>
+
+            <div class="interest-stats">
+                <div class="stat-card">
+                    <span class="stat-number" id="total-items">0</span>
+                    <span class="stat-label">Total Items</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="available-items">0</span>
+                    <span class="stat-label">Available</span>
+                </div>
+                <div class="stat-card">
+                    <span class="stat-number" id="total-value">$0</span>
+                    <span class="stat-label">Total Value</span>
+                </div>
+            </div>
+
+            <div class="categories-grid" id="explore-categories">
+                <!-- Categories will be rendered here -->
+            </div>
+
+            <div class="filtered-items" id="explore-items">
+                <!-- Filtered items will be rendered here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
