@@ -698,7 +698,7 @@
                         <div class="product-actions">
                             <button class="btn btn-secondary tooltip" data-tooltip="Open link" onclick="openLink('${item.id}')">🔗</button>
                             <button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">
-                                Purchase
+                                Mark as purchased
                             </button>
                 </div>
                     </div>
