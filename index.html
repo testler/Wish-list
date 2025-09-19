@@ -31,9 +31,9 @@
                     <span class="nav-icon">⭐</span>
                     <span class="nav-label">By Priority</span>
                 </button>
-                <button class="nav-item" data-route="by-category">
+                <button class="nav-item" data-route="by-project">
                     <span class="nav-icon">📁</span>
-                    <span class="nav-label">By Category</span>
+                    <span class="nav-label">By Project</span>
                 </button>
                 <button class="nav-item" data-route="purchased">
                     <span class="nav-icon">✅</span>
@@ -56,7 +56,6 @@
                     <span class="gift-icon">🎁</span>
                     <span class="title-text">My Wishlist</span>
                 </div>
-                <button id="add-item-btn" class="add-btn tooltip" data-tooltip="Add new wishlist item">+</button>
             </div>
         </header>
 
@@ -76,69 +75,19 @@
         </main>
     </div>
 
-    <!-- Add Item Modal -->
-    <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modal-title" hidden>
+    <!-- Purchase Confirmation Modal -->
+    <div id="purchase-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" hidden>
         <div class="modal-dialog">
             <header class="modal-header">
-                <h2 id="modal-title">Add New Item</h2>
-                <button class="icon-btn" id="modal-close" aria-label="Close">×</button>
-            </header>
-            <form id="item-form" class="modal-body">
-                <div class="form-row">
-                    <label>Title<input name="title" required maxlength="120" /></label>
-                    <label>Price<input name="price" type="number" min="0" step="0.01" required /></label>
-                </div>
-                <div class="form-row">
-                    <label>URL<input name="url" type="url" required /></label>
-                    <label>Image URL<input name="image" type="url" placeholder="https://..." /></label>
-                </div>
-                <div class="form-row">
-                    <label>Vendor<input name="vendor" placeholder="Amazon" /></label>
-                    <label>Rank
-                        <select name="rank">
-                            <option value="S">S</option>
-                            <option value="A">A</option>
-                            <option value="B">B</option>
-                            <option value="C">C</option>
-                        </select>
-                    </label>
-                </div>
-                <div class="form-row">
-                    <label>Project<input name="project" placeholder="Arcade Cabinet" /></label>
-                    <label>Tags<input name="tags" placeholder="comma,separated" /></label>
-                </div>
-                <label>Notes<textarea name="notes" rows="3" placeholder="Optional"></textarea></label>
-                <footer class="modal-footer">
-                    <button type="button" class="btn btn-ghost" id="modal-cancel">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save</button>
-                </footer>
-            </form>
-        </div>
-    </div>
-
-    <!-- Project Management Modal -->
-    <div id="project-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="project-modal-title" hidden>
-        <div class="modal-dialog">
-            <header class="modal-header">
-                <h2 id="project-modal-title">Manage Projects</h2>
-                <button class="icon-btn" id="project-modal-close" aria-label="Close">×</button>
+                <h2>Confirm Purchase</h2>
+                <button class="icon-btn" id="purchase-modal-close" aria-label="Close">×</button>
             </header>
             <div class="modal-body">
-                <div class="project-list" id="project-list">
-                    <!-- Projects will be rendered here -->
-                </div>
-                <form id="project-form" class="project-form">
-                    <h3>Add New Project</h3>
-                    <div class="form-row">
-                        <label>Project Name<input name="name" required maxlength="50" /></label>
-                        <label>Color<input name="color" type="color" value="#1EA7FD" /></label>
-                    </div>
-                    <label>Description<textarea name="description" rows="3" placeholder="What is this project about?"></textarea></label>
-                    <footer class="modal-footer">
-                        <button type="button" class="btn btn-ghost" id="project-cancel">Cancel</button>
-                        <button type="submit" class="btn btn-primary">Add Project</button>
-                    </footer>
-                </form>
+                <p id="purchase-confirm-text">Are you sure you want to mark this item as purchased?</p>
+                <footer class="modal-footer">
+                    <button type="button" class="btn btn-ghost" id="purchase-cancel">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="purchase-confirm">Yes, Mark as Purchased</button>
+                </footer>
             </div>
         </div>
     </div>

@@ -5,170 +5,30 @@
     let currentRoute = 'home';
     let searchQuery = '';
     let items = [];
-    let categories = [];
+    let projects = [];
 
-    // Sample data matching the screenshots
-    const sampleCategories = [
-        {
-            id: 'gaming-tech',
-            name: 'Gaming & Tech',
-            description: 'Gaming equipment, tech gadgets, and electronics for entertainment and productivity.',
-            icon: '🎮',
-            color: '#6366f1',
-            giftNote: 'Perfect for birthdays - tech and gaming gear!',
-            itemCount: 1,
-            total: 25
-        },
-        {
-            id: 'car-automotive',
-            name: 'Car & Automotive',
-            description: 'Car accessories, modifications, and automotive tools for vehicle improvements.',
-            icon: '🚗',
-            color: '#3b82f6',
-            giftNote: 'Great practical gifts for car enthusiasts',
-            itemCount: 1,
-            total: 32
-        },
-        {
-            id: 'workshop-tools',
-            name: 'Workshop & Tools',
-            description: 'Tools, organization, and workshop equipment for DIY projects and repairs.',
-            icon: '🔧',
-            color: '#8b5cf6',
-            giftNote: 'Always useful for home improvement projects',
-            itemCount: 3,
-            total: 70
-        },
-        {
-            id: 'creative-hobbies',
-            name: 'Creative & Hobbies',
-            description: 'Art supplies, craft materials, and hobby equipment for creative pursuits.',
-            icon: '🎨',
-            color: '#10b981',
-            giftNote: 'Great for encouraging creativity',
-            itemCount: 0,
-            total: 0
-        },
-        {
-            id: 'maker-diy',
-            name: 'Maker & DIY',
-            description: '3D printing, electronics, and maker supplies for building and creating things.',
-            icon: '⚙️',
-            color: '#f59e0b',
-            giftNote: 'Fun for the tech-savvy maker',
-            itemCount: 1,
-            total: 10
-        },
-        {
-            id: 'gardening-plants',
-            name: 'Gardening & Plants',
-            description: 'Garden tools, plants, and outdoor equipment for green-thumb enthusiasts.',
-            icon: '🌱',
-            color: '#059669',
-            giftNote: 'Perfect for nature lovers',
-            itemCount: 0,
-            total: 0
-        }
-    ];
+    // Remote data source (JSONBin)
+    // Set one of these to your JSONBin endpoint(s). If JSONBIN_URL is provided, it should
+    // return an object with shape: { items: Item[], projects: Project[] }
+    // If you prefer separate bins, set JSONBIN_ITEMS_URL and/or JSONBIN_PROJECTS_URL instead.
+    const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/68bd0199ae596e708fe558a8/latest';
+    const JSONBIN_ITEMS_URL = '';
+    const JSONBIN_PROJECTS_URL = '';
+    const JSONBIN_KEY = '$2a$10$qCWunkuQ.RvrVSMrdAzXA.h.BWSmvB6NkAIaEXVd5rUQ7E4RzwCyq'; // X-Access-Key for JSONBin
 
-    const sampleItems = [
-        {
-            id: 'esd-work-mat',
-            title: 'ESD Safe Work Mat',
-            price: 29.00,
-            category: 'workshop-tools',
-            rank: 'S',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
-            tracked: true,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'gaming-headset',
-            title: 'Wireless Gaming Headset',
-            price: 25.00,
-            category: 'gaming-tech',
-            rank: 'A',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1599669454699-248893623440?w=400',
-            tracked: false,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'car-organizer',
-            title: 'Car Trunk Organizer',
-            price: 32.00,
-            category: 'car-automotive',
-            rank: 'B',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1449824913935-59a10b8d2000?w=400',
-            tracked: true,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: '3d-printer-filament',
-            title: '3D Printer Filament PLA',
-            price: 10.00,
-            category: 'maker-diy',
-            rank: 'B',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
-            tracked: false,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'usb-cable',
-            title: 'USB-C Cable 6ft',
-            price: 12.99,
-            category: 'gaming-tech',
-            rank: 'C',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400',
-            tracked: false,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'phone-stand',
-            title: 'Adjustable Phone Stand',
-            price: 15.99,
-            category: 'gaming-tech',
-            rank: 'B',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1512054502232-10a0a035d672?w=400',
-            tracked: true,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'car-charger',
-            title: 'Dual USB Car Charger',
-            price: 8.99,
-            category: 'car-automotive',
-            rank: 'A',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1558618047-3c8c76ca7d13?w=400',
-            tracked: false,
-            purchased: false,
-            dateAdded: new Date().toISOString()
-        },
-        {
-            id: 'screwdriver-set',
-            title: 'Mini Screwdriver Set',
-            price: 18.50,
-            category: 'workshop-tools',
-            rank: 'A',
-            vendor: 'Amazon',
-            image: 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?w=400',
-            tracked: true,
-            purchased: false,
-            dateAdded: new Date().toISOString()
+    // No local samples – data will be fetched from JSONBin or loaded from localStorage
+
+    function readLocal() {
+        try {
+            const ii = JSON.parse(localStorage.getItem('wishlist-items') || '[]');
+            const pp = JSON.parse(localStorage.getItem('wishlist-projects') || '[]');
+            return { items: Array.isArray(ii) ? ii : [], projects: Array.isArray(pp) ? pp : [] };
+        } catch {
+            return { items: [], projects: [] };
         }
-    ];
+    }
+
+    // No local sample items – will be fetched
 
     // DOM Elements
     const menuBtn = document.getElementById('menu-btn');
@@ -177,12 +37,16 @@
     const navItems = document.querySelectorAll('.nav-item');
     const contentArea = document.getElementById('content-area');
     const searchInput = document.getElementById('global-search');
-    const addItemBtn = document.getElementById('add-item-btn');
+    const purchaseModal = document.getElementById('purchase-modal');
+    const purchaseModalClose = document.getElementById('purchase-modal-close');
+    const purchaseCancel = document.getElementById('purchase-cancel');
+    const purchaseConfirm = document.getElementById('purchase-confirm');
+    let itemToPurchase = null;
     const homeTitle = document.getElementById('home-title');
 
     // Initialize App
-    function init() {
-        loadData();
+    async function init() {
+        await loadData();
         bindEvents();
         initRouting();
         render();
@@ -204,7 +68,7 @@
             if (event.state && event.state.route) {
                 currentRoute = event.state.route;
                 updateActiveNavItem();
-                render();
+                    render();
             } else {
                 // Fallback if no state
                 const urlParams = new URLSearchParams(window.location.search);
@@ -212,34 +76,50 @@
                 currentRoute = route;
                 updateActiveNavItem();
                 render();
-            }
-        });
-    }
-
-    // Load data from localStorage or use sample data
-    function loadData() {
-        const savedItems = localStorage.getItem('wishlist-items');
-        const savedCategories = localStorage.getItem('wishlist-categories');
-
-        if (savedItems) {
-            items = JSON.parse(savedItems);
-        } else {
-            items = [...sampleItems];
-            saveData();
+                }
+            });
         }
 
-        if (savedCategories) {
-            categories = JSON.parse(savedCategories);
-        } else {
-            categories = [...sampleCategories];
-            saveData();
+    // Load data ALWAYS from JSONBin first, then cache locally
+    async function loadData() {
+        try {
+            const headers = {
+                'X-Access-Key': JSONBIN_KEY
+            };
+            console.log('Fetching from JSONBin...', JSONBIN_URL);
+            console.log('Using headers:', headers);
+            
+            const res = await fetch(JSONBIN_URL, { headers });
+            console.log('Response status:', res.status, res.statusText);
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
+            const raw = await res.json();
+            console.log('JSONBin response:', raw);
+            
+            // JSONBin v3 wraps payload in { record: {...} }
+            const data = raw && raw.record ? raw.record : raw;
+            items = Array.isArray(data.items) ? data.items : [];
+            projects = Array.isArray(data.projects) ? data.projects : [];
+            
+            console.log(`Loaded ${items.length} items and ${projects.length} projects from JSONBin`);
+                await saveData();
+        } catch (e) {
+            console.error('Failed to fetch JSONBin data:', e);
+            // Fallback to cached data only if JSONBin fails
+            const saved = readLocal();
+            items = saved.items;
+            projects = saved.projects;
+            console.log(`Fallback: using cached ${items.length} items and ${projects.length} projects`);
         }
     }
 
     // Save data to localStorage
     function saveData() {
         localStorage.setItem('wishlist-items', JSON.stringify(items));
-        localStorage.setItem('wishlist-categories', JSON.stringify(categories));
+        localStorage.setItem('wishlist-projects', JSON.stringify(projects));
     }
 
     // Bind event listeners
@@ -265,10 +145,12 @@
             render();
         });
 
-        // Add item
-        addItemBtn.addEventListener('click', () => {
-            // TODO: Open add item modal
-            console.log('Add item clicked');
+        // Purchase modal
+        purchaseModalClose.addEventListener('click', closePurchaseModal);
+        purchaseCancel.addEventListener('click', closePurchaseModal);
+        purchaseConfirm.addEventListener('click', confirmPurchase);
+        purchaseModal.addEventListener('click', (e) => {
+            if (e.target === purchaseModal) closePurchaseModal();
         });
 
         // Home title click
@@ -276,10 +158,14 @@
             navigateTo('home');
         });
 
-        // Escape key to close nav
+        // Escape key to close nav and modals
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !navOverlay.hasAttribute('hidden')) {
-                closeNav();
+            if (e.key === 'Escape') {
+                if (!navOverlay.hasAttribute('hidden')) {
+                    closeNav();
+                } else if (!purchaseModal.hasAttribute('hidden')) {
+                    closePurchaseModal();
+                }
             }
         });
     }
@@ -294,30 +180,109 @@
     }
 
     function navigateTo(route) {
-        if (currentRoute === route) return; // Don't navigate to same route
+        console.log(`navigateTo called with route: ${route}, current route: ${currentRoute}`);
+        
+        if (currentRoute === route) {
+            console.log('Same route, skipping navigation');
+            return; // Don't navigate to same route
+        }
         
         currentRoute = route;
+        console.log(`Route changed to: ${currentRoute}`);
         updateActiveNavItem();
         
         // Update URL and browser history
         const url = new URL(window.location);
         if (route === 'home') {
             url.searchParams.delete('route');
-        } else {
+                    } else {
             url.searchParams.set('route', route);
         }
         window.history.pushState({ route: route }, '', url.toString());
         
+        console.log('About to render...');
         render();
+        console.log('Render complete');
     }
 
     function goBack() {
         // Use browser's back functionality
         if (window.history.length > 1) {
             window.history.back();
-        } else {
+                } else {
             // Fallback to home if no history
             navigateTo('home');
+        }
+    }
+
+    // Purchase modal functions
+    function openPurchaseModal(itemId) {
+        const item = items.find(i => i.id === itemId);
+        if (item) {
+            itemToPurchase = itemId;
+            document.getElementById('purchase-confirm-text').textContent = 
+                `Are you sure you want to mark "${item.title}" as purchased? This will remove it from your wishlist.`;
+            purchaseModal.removeAttribute('hidden');
+            purchaseModal.setAttribute('aria-hidden', 'false');
+        }
+    }
+
+    function closePurchaseModal() {
+        purchaseModal.setAttribute('hidden', 'true');
+        purchaseModal.setAttribute('aria-hidden', 'true');
+        itemToPurchase = null;
+    }
+
+    async function confirmPurchase() {
+        if (itemToPurchase) {
+            const item = items.find(i => i.id === itemToPurchase);
+            if (item) {
+                // Mark as purchased and save to JSONBin
+                item.purchased = true;
+                try {
+                    await updateJSONBin();
+                    closePurchaseModal();
+            render();
+                    toast(`"${item.title}" marked as purchased!`);
+                } catch (error) {
+                    console.error('Failed to update JSONBin:', error);
+                    toast('Failed to update. Please try again.');
+                }
+            }
+        }
+    }
+
+    // Update JSONBin with current data
+    async function updateJSONBin() {
+        try {
+            const headers = {
+                'Content-Type': 'application/json',
+                'X-Access-Key': JSONBIN_KEY
+            };
+            
+            const payload = { items, projects };
+            console.log('Updating JSONBin with payload:', payload);
+            
+            // Use base URL without /latest for updates
+            const updateUrl = JSONBIN_URL.replace('/latest', '');
+            
+            const res = await fetch(updateUrl, {
+                method: 'PUT',
+                headers,
+                body: JSON.stringify(payload)
+            });
+            
+            console.log('Update response status:', res.status, res.statusText);
+            
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+            }
+            
+            await saveData(); // Also update local cache
+            console.log('JSONBin updated successfully');
+        } catch (error) {
+            console.error('Failed to update JSONBin:', error);
+            throw error;
         }
     }
 
@@ -343,8 +308,8 @@
             case 'by-rank':
                 renderByPriority();
                 break;
-            case 'by-category':
-                renderByCategory();
+            case 'by-project':
+                renderByProject();
                 break;
             case 'purchased':
                 renderPurchased();
@@ -365,7 +330,7 @@
             B: items.filter(item => item.rank === 'B').length,
             C: items.filter(item => item.rank === 'C').length
         };
-        const categoryCount = categories.length;
+        const projectCount = projects.length;
 
         contentArea.innerHTML = `
             <div class="home-hero">
@@ -373,7 +338,7 @@
                 <h1 class="hero-title">My Gift Wishlist</h1>
                 <p class="hero-subtitle">Birthday & Christmas gift ideas, organized just for you!</p>
                 <div class="hero-dates">
-                    <div class="date-badge">🎂 Birthday: March 15th</div>
+                    <div class="date-badge">🎂 Birthday: September 22nd</div>
                     <div class="date-badge">🎄 Christmas Dreams</div>
                 </div>
             </div>
@@ -401,7 +366,7 @@
                     <div class="category-header">
                         <div class="category-icon">⭐</div>
                         <div class="category-title">By Priority</div>
-                    </div>
+                        </div>
                     <div class="category-description">See what I want most (S-tier = dream gifts!)</div>
                     <div class="category-pills">
                         <span class="priority-pill">S: ${rankCounts.S}</span>
@@ -411,15 +376,15 @@
                     </div>
                 </div>
 
-                <div class="category-card by-category" data-route="by-category">
+                <div class="category-card by-category" data-route="by-project">
                     <div class="category-header">
                         <div class="category-icon">📁</div>
-                        <div class="category-title">By Category</div>
+                        <div class="category-title">By Project</div>
                     </div>
-                    <div class="category-description">Browse gifts by my hobbies and interests</div>
-                    <div class="category-count">${categoryCount} categories</div>
-                </div>
-            </div>
+                    <div class="category-description">Browse my wishlist by projects and goals</div>
+                    <div class="category-count">${projectCount} projects</div>
+                            </div>
+                    </div>
         `;
 
         // Add click handlers for category cards
@@ -521,7 +486,7 @@
                 <div class="tier-count">
                     <div class="tier-letter rank-S">S</div>
                     <div class="tier-number">${rankCounts.S}</div>
-                </div>
+            </div>
                 <div class="tier-count">
                     <div class="tier-letter rank-A">A</div>
                     <div class="tier-number">${rankCounts.A}</div>
@@ -533,7 +498,7 @@
                 <div class="tier-count">
                     <div class="tier-letter rank-C">C</div>
                     <div class="tier-number">${rankCounts.C}</div>
-                </div>
+            </div>
             </div>
 
             <div class="filter-tabs">
@@ -542,7 +507,7 @@
                 <button class="filter-tab" data-rank="A">A Tier (${rankCounts.A})</button>
                 <button class="filter-tab" data-rank="B">B Tier (${rankCounts.B})</button>
                 <button class="filter-tab" data-rank="C">C Tier (${rankCounts.C})</button>
-            </div>
+                </div>
 
             ${renderItemGrid(filteredItems)}
         `;
@@ -583,33 +548,37 @@
         });
     }
 
-    // Render by category view
-    function renderByCategory() {
+    // Render by project view
+    function renderByProject() {
         contentArea.innerHTML = `
             <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
                 ← Back
             </button>
             <div class="page-header">
-                <h1 class="page-title">Gift Categories</h1>
-                <p class="page-subtitle">Browse my wishlist by interests and hobbies</p>
+                <h1 class="page-title">Projects</h1>
+                <p class="page-subtitle">Browse my wishlist by projects and goals</p>
             </div>
 
             <div class="category-grid">
-                ${categories.map(category => `
-                    <div class="category-card" style="background: linear-gradient(135deg, ${category.color}22, ${category.color}44);" data-category="${category.id}">
+                ${projects.map(project => {
+                    // Calculate actual item count for this project
+                    const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
+                    
+                    return `
+                    <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
                         <div class="category-header">
-                            <div class="category-icon">${category.icon}</div>
-                            <div class="category-title">${category.name}</div>
+                            <div class="category-icon">${project.icon}</div>
+                            <div class="category-title">${project.name}</div>
                         </div>
-                        <div class="category-description">${category.description}</div>
+                        <div class="category-description">${project.description}</div>
                         <div style="margin-top: 12px;">
                             <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
-                            <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${category.giftNote}</div>
+                            <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
                         </div>
-                        <div class="category-count" style="margin-top: 16px;">${category.itemCount} items</div>
-                        <div style="color: rgba(255,255,255,0.7); font-size: 14px;">Total: $${category.total}</div>
+                        <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
                     </div>
-                `).join('')}
+                    `;
+                }).join('')}
             </div>
         `;
 
@@ -620,31 +589,41 @@
         }
 
         // Add click handlers
-        document.querySelectorAll('.category-card[data-category]').forEach(card => {
+        document.querySelectorAll('.category-card[data-project]').forEach(card => {
             card.addEventListener('click', (e) => {
-                const categoryId = e.currentTarget.getAttribute('data-category');
-                const category = categories.find(c => c.id === categoryId);
-                if (category) {
-                    const categoryItems = items.filter(item => item.category === categoryId);
+                const projectId = e.currentTarget.getAttribute('data-project');
+                const project = projects.find(p => p.id === projectId);
+                if (project) {
+                    const projectItems = items.filter(item => item.project === projectId);
                     
                     contentArea.innerHTML = `
-                        <button class="back-button tooltip" data-tooltip="Back to categories" id="back-to-categories">
-                            ← Back to Categories
+                        <button class="back-button tooltip" data-tooltip="Back to projects" id="back-to-projects">
+                            ← Back to Projects
                         </button>
                         <div class="page-header">
-                            <h1 class="page-title">${category.name}</h1>
-                            <p class="page-subtitle">${category.description}</p>
+                            <h1 class="page-title">${project.name}</h1>
+                            <p class="page-subtitle">${project.description}</p>
                         </div>
-                        ${renderItemGrid(categoryItems)}
+                        ${renderItemGrid(projectItems)}
                     `;
 
-                    // Add back to categories event listener
-                    const backToCategoriesBtn = document.getElementById('back-to-categories');
-                    if (backToCategoriesBtn) {
-                        backToCategoriesBtn.addEventListener('click', () => {
-                            navigateTo('by-category');
-                        });
-                    }
+                    // Add back to projects event listener
+                    setTimeout(() => {
+                        const backToProjectsBtn = document.getElementById('back-to-projects');
+                        if (backToProjectsBtn) {
+                            // Remove any existing listeners first
+                            backToProjectsBtn.replaceWith(backToProjectsBtn.cloneNode(true));
+                            const newBtn = document.getElementById('back-to-projects');
+                            newBtn.addEventListener('click', (e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                console.log('Back to projects clicked - rendering project list');
+                                renderByProject();
+                            });
+    } else {
+                            console.error('Back to projects button not found');
+                        }
+                    }, 0);
                 }
             });
         });
@@ -664,7 +643,7 @@
             <div class="page-header">
                 <h1 class="page-title">Purchased Items</h1>
                 <p class="page-subtitle">Items that have been bought</p>
-            </div>
+                </div>
             ${renderItemGrid(purchasedItems)}
         `;
 
@@ -697,7 +676,7 @@
     // Render individual item cards
     function renderItemCards(itemList) {
         return itemList.map(item => {
-            const category = categories.find(c => c.id === item.category);
+            const project = projects.find(p => p.id === item.project);
             
             return `
                 <div class="product-card">
@@ -715,17 +694,13 @@
                         <div class="product-vendor">
                             <img class="vendor-icon" src="https://www.google.com/s2/favicons?sz=16&domain_url=amazon.com" alt="Amazon">
                             <span>${item.vendor}</span>
-                        </div>
+                    </div>
                         <div class="product-actions">
-                            <button class="btn btn-secondary tooltip" data-tooltip="Open Amazon link" onclick="openLink('${item.id}')">🔗</button>
-                            <button class="btn ${item.tracked ? 'btn-primary' : 'btn-secondary'} tooltip" data-tooltip="${item.tracked ? 'Remove from tracked' : 'Track this item'}" onclick="toggleTrack('${item.id}')">
-                                ${item.tracked ? '💖' : '🤍'}
+                            <button class="btn btn-secondary tooltip" data-tooltip="Open link" onclick="openLink('${item.id}')">🔗</button>
+                            <button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">
+                                Purchase
                             </button>
-                            <button class="btn-icon tooltip" data-tooltip="${item.purchased ? 'Mark as not purchased' : 'Mark as purchased'}" onclick="togglePurchased('${item.id}')">
-                                ${item.purchased ? '✅' : '⭕'}
-                            </button>
-                            <button class="btn-icon tooltip" data-tooltip="More options" onclick="showMore('${item.id}')">⋯</button>
-                        </div>
+                </div>
                     </div>
                 </div>
             `;
@@ -743,32 +718,22 @@
         }
     };
 
-    window.toggleTrack = (itemId) => {
-        const item = items.find(i => i.id === itemId);
-        if (item) {
-            item.tracked = !item.tracked;
-            saveData();
-            render();
-        }
-    };
+    // Removed tracked feature
 
-    window.togglePurchased = (itemId) => {
-        const item = items.find(i => i.id === itemId);
-        if (item) {
-            item.purchased = !item.purchased;
-            saveData();
-            render();
-        }
-    };
-
-    window.showMore = (itemId) => {
-        // TODO: Show more options modal
-        console.log('Show more options for item:', itemId);
-    };
+    // Add toast function
+    function toast(message) {
+        const toastStack = document.getElementById('toast-stack');
+        const toast = document.createElement('div');
+        toast.className = 'toast';
+        toast.textContent = message;
+        toastStack.appendChild(toast);
+        setTimeout(() => toast.remove(), 3000);
+    }
 
     // Make functions globally available
     window.navigateTo = navigateTo;
     window.goBack = goBack;
+    window.openPurchaseModal = openPurchaseModal;
 
     // Initialize app when DOM is loaded
     if (document.readyState === 'loading') {
