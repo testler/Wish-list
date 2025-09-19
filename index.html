@@ -3,108 +3,77 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>StashList</title>
+    <title>My Wishlist</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <meta name="color-scheme" content="light dark">
+    <meta name="color-scheme" content="dark">
 </head>
 <body>
-    <div class="app-shell">
-        <aside class="sidebar" aria-label="Primary">
-            <div class="sidebar-header">
-                <div class="app-logo" aria-label="StashList">StashList</div>
+    <!-- Mobile Navigation Overlay -->
+    <div id="nav-overlay" class="nav-overlay" hidden>
+        <div class="nav-sidebar">
+            <div class="nav-header">
+                <button class="close-nav">×</button>
             </div>
-            <nav class="nav">
-                <button class="nav-item is-active" data-route="overview" aria-current="page">
+            <nav class="nav-menu">
+                <button class="nav-item" data-route="home">
                     <span class="nav-icon">🏠</span>
-                    <span class="nav-label">Overview</span>
+                    <span class="nav-label">Home</span>
                 </button>
                 <button class="nav-item" data-route="under-20">
                     <span class="nav-icon">💸</span>
                     <span class="nav-label">Under $20</span>
                 </button>
-                <button class="nav-item" data-route="under-30">
-                    <span class="nav-icon">💵</span>
-                    <span class="nav-label">Under $30</span>
+                <button class="nav-item" data-route="30-items">
+                    <span class="nav-icon">🎯</span>
+                    <span class="nav-label">$30 Items</span>
                 </button>
                 <button class="nav-item" data-route="by-rank">
-                    <span class="nav-icon">🎯</span>
-                    <span class="nav-label">By Rank</span>
+                    <span class="nav-icon">⭐</span>
+                    <span class="nav-label">By Priority</span>
                 </button>
-                <button class="nav-item" data-route="by-project">
+                <button class="nav-item" data-route="by-category">
                     <span class="nav-icon">📁</span>
-                    <span class="nav-label">By Project</span>
+                    <span class="nav-label">By Category</span>
                 </button>
-                <button class="nav-item" data-route="projects">
-                    <span class="nav-icon">🗂️</span>
-                    <span class="nav-label">Projects</span>
-                </button>
-                <button class="nav-item is-muted" data-route="purchased">
+                <button class="nav-item" data-route="purchased">
                     <span class="nav-icon">✅</span>
                     <span class="nav-label">Purchased</span>
                 </button>
-                <button class="nav-item" data-route="components">
-                    <span class="nav-icon">🧩</span>
-                    <span class="nav-label">Components</span>
-                </button>
             </nav>
-        </aside>
-
-        <div class="content-area">
-            <header class="app-header" aria-label="Global">
-                <div class="header-left">
-                    <div class="search">
-                        <span class="search-icon">🔎</span>
-                        <input id="global-search" type="search" placeholder="Search items, vendors, tags" aria-label="Search" />
-                    </div>
-                    <div class="filter-chips" role="group" aria-label="Quick filters">
-                        <button class="chip" data-chip="price">Price</button>
-                        <button class="chip" data-chip="rank">Rank</button>
-                        <button class="chip" data-chip="project">Project</button>
-                    </div>
-                </div>
-                <div class="header-right">
-                    <button id="manage-projects-btn" class="btn btn-ghost" style="display: none;">Manage Projects</button>
-                    <button id="add-item-btn" class="btn btn-primary">Add Item</button>
-                </div>
-            </header>
-
-            <main id="main" class="main" tabindex="-1">
-                <section class="section-header">
-                    <div>
-                        <h1 id="section-title">Overview</h1>
-                        <p id="section-subtitle" class="section-subtitle"></p>
-                    </div>
-                    <div class="section-controls">
-                        <div class="sort">
-                            <label for="sort-select" class="visually-hidden">Sort by</label>
-                            <select id="sort-select">
-                                <option value="date-desc">Date Added (newest)</option>
-                                <option value="price-asc">Price (low → high)</option>
-                                <option value="price-desc">Price (high → low)</option>
-                                <option value="rank-desc">Rank (S → C)</option>
-                            </select>
-                        </div>
-                        <div class="view-toggle" role="group" aria-label="View">
-                            <button class="toggle is-active" data-view="cards">Cards</button>
-                            <button class="toggle" data-view="list">List</button>
-                        </div>
-                    </div>
-                </section>
-
-                <div id="banner" class="banner" hidden></div>
-
-                <div id="filter-bar" class="filter-bar"></div>
-
-                <div id="home-quick" class="home-quick" hidden></div>
-
-                <div id="tag-pills" class="tag-pills" role="group" aria-label="Tag filters"></div>
-
-                <div id="grid" class="items-grid" aria-live="polite"></div>
-
-                <div id="pagination" class="pagination" hidden></div>
-            </main>
         </div>
+    </div>
+
+    <div class="app-container">
+        <!-- Top Header -->
+        <header class="top-header">
+            <div class="header-content">
+                <button id="menu-btn" class="menu-btn tooltip" data-tooltip="Open navigation menu">
+                    <span class="hamburger"></span>
+                    <span class="hamburger"></span>
+                    <span class="hamburger"></span>
+                </button>
+                <div class="header-title clickable" id="home-title">
+                    <span class="gift-icon">🎁</span>
+                    <span class="title-text">My Wishlist</span>
+                </div>
+                <button id="add-item-btn" class="add-btn tooltip" data-tooltip="Add new wishlist item">+</button>
+            </div>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <div class="search-bar">
+                <span class="search-icon">🔍</span>
+                <input id="global-search" type="search" placeholder="Search gift ideas..." />
+            </div>
+        </div>
+
+        <!-- Main Content -->
+        <main id="main-content" class="main-content">
+            <div id="content-area" class="content-area">
+                <!-- Content will be dynamically rendered here -->
+            </div>
+        </main>
     </div>
 
     <!-- Add Item Modal -->
