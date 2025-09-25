@@ -11,6 +11,34 @@
     let secretTapCount = 0;
     let lastSecretTapTs = 0;
 
+    // Sound effects
+    const SFX = {
+        // Click on any category card (Mario mushroom)
+        click: new Audio('sounds/super_mario_bros_mushroom_sound_effect_58k.mp3'),
+        // Secret area unlock / admin login (Zelda secret ringtone)
+        secret: new Audio('sounds/ringtones-zelda-1.mp3'),
+        // Confirm purchase (Zelda chest)
+        chest: new Audio('sounds/zelda-chest-opening-and-item-catch.mp3')
+    };
+    const MASTER_SFX_VOLUME = 0.5; // 50%
+    Object.values(SFX).forEach(a => {
+        try {
+            a.preload = 'auto';
+            a.volume = MASTER_SFX_VOLUME;
+        } catch {}
+    });
+
+    function playSfx(key) {
+        const a = SFX[key];
+        if (!a) return;
+        try {
+            a.currentTime = 0;
+            a.play();
+        } catch (e) {
+            console.warn('SFX play failed', key, e);
+        }
+    }
+
     // Remote data source (JSONBin)
     // Set one of these to your JSONBin endpoint(s). If JSONBIN_URL is provided, it should
     // return an object with shape: { items: Item[], projects: Project[] }
@@ -57,6 +85,7 @@
         function tryLogin() {
             const val = (passInput.value || '').trim();
             if (val.toLowerCase() === 'secrect') { // per request exact word
+                playSfx('secret');
                 isAdmin = true;
                 localStorage.setItem('wishlist-admin', 'true');
                 navigateTo('admin');
@@ -600,7 +629,8 @@
                 try {
                     await updateJSONBin();
                     closePurchaseModal();
-            render();
+                    playSfx('chest');
+                    render();
                     toast(`"${item.title}" marked as purchased!`);
                 } catch (error) {
                     console.error('Failed to update JSONBin:', error);
@@ -778,6 +808,7 @@
             card.addEventListener('click', (e) => {
                 const route = e.currentTarget.getAttribute('data-route');
                 if (route) {
+                    playSfx('click');
                     navigateTo(route);
                 }
             });
@@ -795,6 +826,7 @@
                 secretTapCount += 1;
                 if (secretTapCount >= 5) {
                     secretTapCount = 0;
+                    playSfx('secret');
                     navigateTo('admin-login');
                 }
             });
