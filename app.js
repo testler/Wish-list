@@ -293,8 +293,28 @@
         });
     }
 
+    // Update header content for non-home pages
+    function updateHeaderContent() {
+        const headerContent = document.querySelector('.header-content');
+        if (headerContent && currentRoute !== 'home') {
+            headerContent.innerHTML = `
+                <div class="header-brand" onclick="navigateTo('home')" style="cursor: pointer;">
+                    <div class="header-icon">🎁</div>
+                    <div class="header-title">Josh's Wishlist</div>
+                </div>
+                <div class="header-subtitle" onclick="navigateTo('home')" style="cursor: pointer;">A curated collection of birthday wishes organized just for you</div>
+            `;
+        }
+    }
+
     // Main render function
     function render() {
+        // Update body class for styling
+        document.body.classList.toggle('home-page', currentRoute === 'home');
+        
+        // Update header content for non-home pages
+        updateHeaderContent();
+        
         if (currentRoute.startsWith('project-')) {
             const projectId = currentRoute.replace('project-', '');
             renderProjectDetail(projectId);
@@ -339,13 +359,9 @@
 
         contentArea.innerHTML = `
             <div class="home-hero">
-                <div class="hero-icon">🎂</div>
-                <h1 class="hero-title">Josh's Wishlist!</h1>
-                <p class="hero-subtitle">Birthday & Christmas gift ideas, organized just for you!</p>
-                <div class="hero-dates">
-                    <div class="date-badge">🎂 Birthday: September 22nd</div>
-                    <div class="date-badge">🎄 Christmas Dreams</div>
-                </div>
+                <div class="hero-icon">🎁</div>
+                <h1 class="hero-title">Josh's Wishlist</h1>
+                <p class="hero-subtitle">A curated collection of birthday wishes organized just for you</p>
             </div>
 
             <div class="category-grid">
