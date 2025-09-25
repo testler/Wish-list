@@ -20,7 +20,7 @@
         // Confirm purchase (Zelda chest)
         chest: new Audio('sounds/zelda-chest-opening-and-item-catch.mp3')
     };
-    const MASTER_SFX_VOLUME = 0.5; // 50%
+    const MASTER_SFX_VOLUME = 0.1; // 50%
     Object.values(SFX).forEach(a => {
         try {
             a.preload = 'auto';
@@ -84,7 +84,7 @@
 
         function tryLogin() {
             const val = (passInput.value || '').trim();
-            if (val.toLowerCase() === 'secrect') { // per request exact word
+            if (val.toLowerCase() === 'secret') { // per request exact word
                 playSfx('secret');
                 isAdmin = true;
                 localStorage.setItem('wishlist-admin', 'true');
