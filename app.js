@@ -334,8 +334,8 @@
 
         contentArea.innerHTML = `
             <div class="home-hero">
-                <div class="hero-icon">🎁</div>
-                <h1 class="hero-title">My Gift Wishlist</h1>
+                <div class="hero-icon">🎂</div>
+                <h1 class="hero-title">Josh's Wishlist!</h1>
                 <p class="hero-subtitle">Birthday & Christmas gift ideas, organized just for you!</p>
                 <div class="hero-dates">
                     <div class="date-badge">🎂 Birthday: September 22nd</div>
@@ -711,11 +711,40 @@
         `;
     }
 
+    // Helper function to get domain from URL
+    function getDomainFromUrl(url) {
+        try {
+            const urlObj = new URL(url);
+            return urlObj.hostname;
+        } catch (e) {
+            return 'amazon.com'; // fallback
+        }
+    }
+
+    // Helper function to get the primary URL for an item
+    function getItemUrl(item) {
+        // First try direct url field
+        if (item.url) {
+            return item.url;
+        }
+        
+        // Then try links array (get primary link)
+        if (item.links && item.links.length > 0) {
+            const primaryLink = item.links.find(link => link.type === 'primary') || item.links[0];
+            return primaryLink.url;
+        }
+        
+        // Fallback to Amazon
+        return 'https://amazon.com';
+    }
+
     // Render individual item cards
     function renderItemCards(itemList) {
         return itemList.map(item => {
             const project = projects.find(p => p.id === item.project);
             const isPurchased = item.purchased;
+            const itemUrl = getItemUrl(item);
+            const domain = getDomainFromUrl(itemUrl);
             
             return `
                 <div class="product-card${isPurchased ? ' purchased' : ''}">
@@ -731,7 +760,7 @@
                         <h3 class="product-title">${item.title}</h3>
                         <div class="product-price">$${item.price.toFixed(2)}</div>
                         <div class="product-vendor">
-                            <img class="vendor-icon" src="https://www.google.com/s2/favicons?sz=16&domain_url=amazon.com" alt="Amazon">
+                            <img class="vendor-icon" src="https://www.google.com/s2/favicons?sz=16&domain_url=${domain}" alt="${domain}" onerror="this.src='https://www.google.com/s2/favicons?sz=16&domain_url=amazon.com'">
                             <span>${item.vendor}</span>
                     </div>
                         <div class="product-actions">
@@ -750,10 +779,11 @@
     // Item interaction functions
     window.openLink = (itemId) => {
         const item = items.find(i => i.id === itemId);
-        if (item && item.url) {
-            window.open(item.url, '_blank');
+        if (item) {
+            const itemUrl = getItemUrl(item);
+            window.open(itemUrl, '_blank');
         } else {
-            // Simulate Amazon link
+            // Fallback to Amazon
             window.open('https://amazon.com', '_blank');
         }
     };
