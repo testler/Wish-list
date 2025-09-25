@@ -400,11 +400,17 @@
 
     // Render under $20 items
     function renderUnder20() {
-        const filteredItems = items.filter(item => 
+        let filteredItems = items.filter(item => 
             item.price <= 20 && 
-            !item.purchased &&
             (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
         );
+        
+        // Sort to put purchased items at the bottom
+        filteredItems.sort((a, b) => {
+            if (a.purchased && !b.purchased) return 1;
+            if (!a.purchased && b.purchased) return -1;
+            return 0;
+        });
 
         contentArea.innerHTML = `
             <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
@@ -426,12 +432,18 @@
 
     // Render price range items
     function renderPriceRange(min, max, title, description) {
-        const filteredItems = items.filter(item => 
+        let filteredItems = items.filter(item => 
             item.price > min && 
             item.price <= max && 
-            !item.purchased &&
             (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
         );
+        
+        // Sort to put purchased items at the bottom
+        filteredItems.sort((a, b) => {
+            if (a.purchased && !b.purchased) return 1;
+            if (!a.purchased && b.purchased) return -1;
+            return 0;
+        });
 
         contentArea.innerHTML = `
             <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
@@ -461,13 +473,18 @@
         };
 
         let filteredItems = items.filter(item => 
-            !item.purchased &&
             (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
         );
 
-        // Sort by rank priority (S > A > B > C)
+        // Sort by rank priority (S > A > B > C), then put purchased items at bottom
         const rankOrder = { S: 4, A: 3, B: 2, C: 1 };
-        filteredItems.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
+        filteredItems.sort((a, b) => {
+            // First sort by purchased status (purchased items go to bottom)
+            if (a.purchased && !b.purchased) return 1;
+            if (!a.purchased && b.purchased) return -1;
+            // Then sort by rank priority
+            return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
+        });
 
         contentArea.innerHTML = `
             <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
@@ -529,7 +546,6 @@
 
                 // Filter items
                 let filtered = items.filter(item => 
-                    !item.purchased &&
                     (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
                 );
 
@@ -537,7 +553,14 @@
                     filtered = filtered.filter(item => item.rank === rank);
                 }
 
-                filtered.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
+                // Sort by rank priority, then put purchased items at bottom
+                filtered.sort((a, b) => {
+                    // First sort by purchased status (purchased items go to bottom)
+                    if (a.purchased && !b.purchased) return 1;
+                    if (!a.purchased && b.purchased) return -1;
+                    // Then sort by rank priority
+                    return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
+                });
 
                 // Update grid
                 const gridContainer = document.querySelector('.product-grid');
@@ -594,7 +617,14 @@
                 const projectId = e.currentTarget.getAttribute('data-project');
                 const project = projects.find(p => p.id === projectId);
                 if (project) {
-                    const projectItems = items.filter(item => item.project === projectId);
+                    let projectItems = items.filter(item => item.project === projectId);
+                    
+                    // Sort to put purchased items at the bottom
+                    projectItems.sort((a, b) => {
+                        if (a.purchased && !b.purchased) return 1;
+                        if (!a.purchased && b.purchased) return -1;
+                        return 0;
+                    });
                     
                     contentArea.innerHTML = `
                         <button class="back-button tooltip" data-tooltip="Back to projects" id="back-to-projects">
@@ -631,10 +661,18 @@
 
     // Render purchased items
     function renderPurchased() {
-        const purchasedItems = items.filter(item => 
+        let purchasedItems = items.filter(item => 
             item.purchased &&
             (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
         );
+        
+        // Sort by date purchased (most recent first) or by rank if no date
+        const rankOrder = { S: 4, A: 3, B: 2, C: 1 };
+        purchasedItems.sort((a, b) => {
+            // If we had purchase dates, we could sort by those
+            // For now, sort by rank priority
+            return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
+        });
 
         contentArea.innerHTML = `
             <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
@@ -677,9 +715,10 @@
     function renderItemCards(itemList) {
         return itemList.map(item => {
             const project = projects.find(p => p.id === item.project);
+            const isPurchased = item.purchased;
             
             return `
-                <div class="product-card">
+                <div class="product-card${isPurchased ? ' purchased' : ''}">
                     <div class="product-image">
                         ${item.image ? 
                             `<img src="${item.image}" alt="${item.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
@@ -697,9 +736,10 @@
                     </div>
                         <div class="product-actions">
                             <button class="btn btn-secondary tooltip" data-tooltip="Open link" onclick="openLink('${item.id}')">🔗</button>
-                            <button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">
-                                Mark as purchased
-                            </button>
+                            ${isPurchased ? 
+                                `<button class="btn btn-purchased tooltip" data-tooltip="Already purchased" disabled>Purchased</button>` :
+                                `<button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">Mark as purchased</button>`
+                            }
                 </div>
                     </div>
                 </div>

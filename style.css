@@ -947,6 +947,28 @@ body {
     }
 }
 
+/* Purchased Item Styling */
+.product-card.purchased {
+    opacity: 0.6;
+    filter: grayscale(0.7);
+}
+
+.product-card.purchased .product-title,
+.product-card.purchased .product-price,
+.product-card.purchased .product-vendor {
+    color: var(--text-muted);
+}
+
+.btn-purchased {
+    background: #dc2626;
+    color: white;
+    border: none;
+}
+
+.btn-purchased:hover {
+    background: #b91c1c;
+}
+
 /* Utility Classes */
 .visually-hidden {
     position: absolute !important;
