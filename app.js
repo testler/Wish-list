@@ -587,20 +587,32 @@
                     // Calculate actual item count for this project
                     const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
                     
-                    return `
-                    <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
-                        <div class="category-header">
-                            <div class="category-icon">${project.icon}</div>
-                            <div class="category-title">${project.name}</div>
+                    // Check if project has an icon image
+                    if (project['project-icon-image']) {
+                        return `
+                        <div class="category-card project-icon-card" data-project="${project.id}">
+                            <div class="project-icon-image-container">
+                                <div class="project-icon-bg" style="background-image: url('${project['project-icon-image']}');"></div>
+                            </div>
+                            <div class="project-name">${project.name}</div>
                         </div>
-                        <div class="category-description">${project.description}</div>
-                        <div style="margin-top: 12px;">
-                            <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
-                            <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
+                        `;
+                    } else {
+                        return `
+                        <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
+                            <div class="category-header">
+                                <div class="category-icon">${project.icon}</div>
+                                <div class="category-title">${project.name}</div>
+                            </div>
+                            <div class="category-description">${project.description}</div>
+                            <div style="margin-top: 12px;">
+                                <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
+                                <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
+                            </div>
+                            <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
                         </div>
-                        <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
-                    </div>
-                    `;
+                        `;
+                    }
                 }).join('')}
             </div>
         `;
