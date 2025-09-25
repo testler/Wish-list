@@ -295,28 +295,33 @@
 
     // Main render function
     function render() {
-        switch (currentRoute) {
-            case 'home':
-                renderHome();
-                break;
-            case 'under-20':
-                renderUnder20();
-                break;
-            case '30-items':
-                renderPriceRange(20, 30, '$30 Items', 'Great value gifts that hit the sweet spot');
-                break;
-            case 'by-rank':
-                renderByPriority();
-                break;
-            case 'by-project':
-                renderByProject();
-                break;
-            case 'purchased':
-                renderPurchased();
-                break;
-            default:
-                renderHome();
-                break;
+        if (currentRoute.startsWith('project-')) {
+            const projectId = currentRoute.replace('project-', '');
+            renderProjectDetail(projectId);
+        } else {
+            switch (currentRoute) {
+                case 'home':
+                    renderHome();
+                    break;
+                case 'under-20':
+                    renderUnder20();
+                    break;
+                case '30-items':
+                    renderPriceRange(20, 30, '$30 Items', 'Great value gifts that hit the sweet spot');
+                    break;
+                case 'by-rank':
+                    renderByPriority();
+                    break;
+                case 'by-project':
+                    renderByProject();
+                    break;
+                case 'purchased':
+                    renderPurchased();
+                    break;
+                default:
+                    renderHome();
+                    break;
+            }
         }
     }
 
@@ -571,6 +576,75 @@
         });
     }
 
+    // Render individual project detail
+    function renderProjectDetail(projectId) {
+        const project = projects.find(p => p.id === projectId);
+        if (!project) {
+            renderHome();
+            return;
+        }
+
+        let projectItems = items.filter(item => item.project === projectId);
+        
+        // Sort to put purchased items at the bottom
+        projectItems.sort((a, b) => {
+            if (a.purchased && !b.purchased) return 1;
+            if (!a.purchased && b.purchased) return -1;
+            return 0;
+        });
+        
+        contentArea.innerHTML = `
+            <button class="back-button tooltip" data-tooltip="Back to projects" id="back-to-projects">
+                ← Back to Projects
+            </button>
+            <div class="page-header">
+                <h1 class="page-title">${project.name}</h1>
+                <div class="project-description-container">
+                    <p class="page-subtitle">${project.description}</p>
+                </div>
+                ${project.giftNote ? `
+                    <div class="project-gift-note">
+                        <div class="gift-note-label">Gift Note:</div>
+                        <div class="gift-note-content">${project.giftNote}</div>
+                    </div>
+                ` : ''}
+                <div class="project-stats">
+                    <div class="stat-item">
+                        <span class="stat-number">${projectItems.length}</span>
+                        <span class="stat-label">Total Items</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">${projectItems.filter(item => !item.purchased).length}</span>
+                        <span class="stat-label">Available</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number">${projectItems.filter(item => item.purchased).length}</span>
+                        <span class="stat-label">Purchased</span>
+                    </div>
+                </div>
+            </div>
+            ${renderItemGrid(projectItems)}
+        `;
+
+        // Add back to projects event listener
+        setTimeout(() => {
+            const backToProjectsBtn = document.getElementById('back-to-projects');
+            if (backToProjectsBtn) {
+                // Remove any existing listeners first
+                backToProjectsBtn.replaceWith(backToProjectsBtn.cloneNode(true));
+                const newBtn = document.getElementById('back-to-projects');
+                newBtn.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    console.log('Back to projects clicked - rendering project list');
+                    navigateTo('by-project');
+                });
+            } else {
+                console.error('Back to projects button not found');
+            }
+        }, 0);
+    }
+
     // Render by project view
     function renderByProject() {
         contentArea.innerHTML = `
@@ -583,11 +657,15 @@
             </div>
 
             <div class="category-grid">
-                ${projects.map(project => {
-                    // Calculate actual item count for this project
-                    const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
-                    
-                    // Check if project has an icon image
+                ${projects
+                    .map(project => {
+                        // Calculate actual item count for this project
+                        const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
+                        return { project, actualItemCount };
+                    })
+                    .sort((a, b) => b.actualItemCount - a.actualItemCount) // Sort by item count descending
+                    .map(({ project, actualItemCount }) => {
+                        // Check if project has an icon image
                     if (project['project-icon-image']) {
                         return `
                         <div class="category-card project-icon-card" data-project="${project.id}">
@@ -629,43 +707,8 @@
                 const projectId = e.currentTarget.getAttribute('data-project');
                 const project = projects.find(p => p.id === projectId);
                 if (project) {
-                    let projectItems = items.filter(item => item.project === projectId);
-                    
-                    // Sort to put purchased items at the bottom
-                    projectItems.sort((a, b) => {
-                        if (a.purchased && !b.purchased) return 1;
-                        if (!a.purchased && b.purchased) return -1;
-                        return 0;
-                    });
-                    
-                    contentArea.innerHTML = `
-                        <button class="back-button tooltip" data-tooltip="Back to projects" id="back-to-projects">
-                            ← Back to Projects
-                        </button>
-                        <div class="page-header">
-                            <h1 class="page-title">${project.name}</h1>
-                            <p class="page-subtitle">${project.description}</p>
-                        </div>
-                        ${renderItemGrid(projectItems)}
-                    `;
-
-                    // Add back to projects event listener
-                    setTimeout(() => {
-                        const backToProjectsBtn = document.getElementById('back-to-projects');
-                        if (backToProjectsBtn) {
-                            // Remove any existing listeners first
-                            backToProjectsBtn.replaceWith(backToProjectsBtn.cloneNode(true));
-                            const newBtn = document.getElementById('back-to-projects');
-                            newBtn.addEventListener('click', (e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                console.log('Back to projects clicked - rendering project list');
-                                renderByProject();
-                            });
-    } else {
-                            console.error('Back to projects button not found');
-                        }
-                    }, 0);
+                    // Navigate to project-specific route
+                    navigateTo(`project-${projectId}`);
                 }
             });
         });
