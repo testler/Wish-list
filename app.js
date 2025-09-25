@@ -319,28 +319,28 @@
             const projectId = currentRoute.replace('project-', '');
             renderProjectDetail(projectId);
         } else {
-            switch (currentRoute) {
-                case 'home':
-                    renderHome();
-                    break;
-                case 'under-20':
-                    renderUnder20();
-                    break;
-                case '30-items':
-                    renderPriceRange(20, 30, '$30 Items', 'Great value gifts that hit the sweet spot');
-                    break;
-                case 'by-rank':
-                    renderByPriority();
-                    break;
-                case 'by-project':
-                    renderByProject();
-                    break;
-                case 'purchased':
-                    renderPurchased();
-                    break;
-                default:
-                    renderHome();
-                    break;
+        switch (currentRoute) {
+            case 'home':
+                renderHome();
+                break;
+            case 'under-20':
+                renderUnder20();
+                break;
+            case '30-items':
+                renderPriceRange(20, 30, '$30 Items', 'Great value gifts that hit the sweet spot');
+                break;
+            case 'by-rank':
+                renderByPriority();
+                break;
+            case 'by-project':
+                renderByProject();
+                break;
+            case 'purchased':
+                renderPurchased();
+                break;
+            default:
+                renderHome();
+                break;
             }
         }
     }
@@ -399,7 +399,7 @@
 
                 <div class="category-card by-category" data-route="by-project">
                     <div class="category-header">
-                        <div class="category-icon">📁</div>
+                        <div class="category-icon">🏗️</div>
                         <div class="category-title">By Project</div>
                     </div>
                     <div class="category-description">Browse my wishlist by projects and goals</div>
@@ -617,6 +617,20 @@
                 <h1 class="page-title">${project.name}</h1>
                 <div class="project-description-container">
                     <p class="page-subtitle">${project.description}</p>
+                    <div class="project-stats">
+                        <div class="stat-item">
+                            <span class="stat-number">${projectItems.length}</span>
+                            <span class="stat-label">Total Items</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${projectItems.filter(item => !item.purchased).length}</span>
+                            <span class="stat-label">Available</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-number">${projectItems.filter(item => item.purchased).length}</span>
+                            <span class="stat-label">Purchased</span>
+                        </div>
+                    </div>
                 </div>
                 ${project.giftNote ? `
                     <div class="project-gift-note">
@@ -624,20 +638,6 @@
                         <div class="gift-note-content">${project.giftNote}</div>
                     </div>
                 ` : ''}
-                <div class="project-stats">
-                    <div class="stat-item">
-                        <span class="stat-number">${projectItems.length}</span>
-                        <span class="stat-label">Total Items</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">${projectItems.filter(item => !item.purchased).length}</span>
-                        <span class="stat-label">Available</span>
-                    </div>
-                    <div class="stat-item">
-                        <span class="stat-number">${projectItems.filter(item => item.purchased).length}</span>
-                        <span class="stat-label">Purchased</span>
-                    </div>
-                </div>
             </div>
             ${renderItemGrid(projectItems)}
         `;
@@ -675,8 +675,8 @@
             <div class="category-grid">
                 ${projects
                     .map(project => {
-                        // Calculate actual item count for this project
-                        const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
+                    // Calculate actual item count for this project
+                    const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
                         return { project, actualItemCount };
                     })
                     .sort((a, b) => b.actualItemCount - a.actualItemCount) // Sort by item count descending
@@ -692,20 +692,20 @@
                         </div>
                         `;
                     } else {
-                        return `
-                        <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
-                            <div class="category-header">
-                                <div class="category-icon">${project.icon}</div>
-                                <div class="category-title">${project.name}</div>
-                            </div>
-                            <div class="category-description">${project.description}</div>
-                            <div style="margin-top: 12px;">
-                                <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
-                                <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
-                            </div>
-                            <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
+                    return `
+                    <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
+                        <div class="category-header">
+                            <div class="category-icon">${project.icon}</div>
+                            <div class="category-title">${project.name}</div>
                         </div>
-                        `;
+                        <div class="category-description">${project.description}</div>
+                        <div style="margin-top: 12px;">
+                            <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
+                            <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
+                        </div>
+                        <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
+                    </div>
+                    `;
                     }
                 }).join('')}
             </div>
@@ -828,19 +828,22 @@
                         <div class="rank-badge rank-${item.rank} tooltip" data-tooltip="Priority: ${item.rank === 'S' ? 'Dream gift!' : item.rank === 'A' ? 'Really want' : item.rank === 'B' ? 'Would love' : 'Nice to have'}">${item.rank}</div>
                     </div>
                     <div class="product-info">
-                        <h3 class="product-title">${item.title}</h3>
-                        <div class="product-price">$${item.price.toFixed(2)}</div>
+                        <div class="product-header">
+                            <h3 class="product-title">${item.title}</h3>
+                            <div class="product-price">$${item.price.toFixed(2)}</div>
+                        </div>
                         <div class="product-vendor">
-                            <img class="vendor-icon" src="https://www.google.com/s2/favicons?sz=16&domain_url=${domain}" alt="${domain}" onerror="this.src='https://www.google.com/s2/favicons?sz=16&domain_url=amazon.com'">
-                            <span>${item.vendor}</span>
-                    </div>
+                            <span class="vendor-badge">${item.vendor}</span>
+                        </div>
                         <div class="product-actions">
-                            <button class="btn btn-secondary tooltip" data-tooltip="Open link" onclick="openLink('${item.id}')">🔗</button>
                             ${isPurchased ? 
                                 `<button class="btn btn-purchased tooltip" data-tooltip="Already purchased" disabled>Purchased</button>` :
                                 `<button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">Mark as purchased</button>`
                             }
-                </div>
+                        </div>
+                        <div class="product-link">
+                            <button class="btn btn-secondary btn-block" onclick="openLink('${item.id}')">View Item</button>
+                        </div>
                     </div>
                 </div>
             `;

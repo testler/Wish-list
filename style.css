@@ -333,32 +333,33 @@ body.home-page .top-header {
 /* Home Screen */
 .home-hero {
     text-align: center;
-    padding: 40px 0;
+    padding: 48px 0 24px;
 }
 
 .hero-icon {
-    width: 80px;
-    height: 80px;
+    width: 64px;
+    height: 64px;
     background: linear-gradient(135deg, var(--accent-blue), var(--accent-teal));
-    border-radius: 20px;
+    border-radius: 16px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 36px;
-    margin: 0 auto 20px;
+    font-size: 28px;
+    margin: 0 auto 14px;
 }
 
 .hero-title {
-    font-size: 32px;
-    font-weight: 700;
-    margin-bottom: 8px;
+    font-size: 28px;
+    font-weight: 800;
+    margin-bottom: 6px;
     color: var(--text-primary);
 }
 
 .hero-subtitle {
     color: var(--text-secondary);
-    font-size: 16px;
-    margin-bottom: 8px;
+    font-size: 14px;
+    max-width: 360px;
+    margin: 0 auto 16px;
 }
 
 .hero-dates {
@@ -403,38 +404,45 @@ body.home-page .top-header {
 }
 
 .category-card.under-20 {
-    background: linear-gradient(135deg, #065f46, #047857);
+    background: linear-gradient(135deg, #10b981, #059669);
 }
 
 .category-card.thirty-items {
-    background: linear-gradient(135deg, #1e40af, #3730a3);
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
 }
 
 .category-card.by-priority {
-    background: linear-gradient(135deg, #7c2d12, #9a3412);
+    background: linear-gradient(135deg, #f97316, #ea580c);
 }
 
 .category-card.by-category {
-    background: linear-gradient(135deg, #92400e, #b45309);
+    background: linear-gradient(135deg, #f43f5e, #ef4444);
 }
 
 .category-header {
-    display: flex;
+    display: grid;
+    grid-template-columns: auto 1fr;
     align-items: center;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 10px;
 }
 
 .category-icon {
-    width: 48px;
-    height: 48px;
-    background: rgba(255, 255, 255, 0.2);
-    border-radius: 12px;
+    width: 56px;
+    height: 56px;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
 }
+
+/* Colored icon tiles to match each card */
+.category-card.under-20 .category-icon { background: linear-gradient(135deg, #34d399, #059669); }
+.category-card.thirty-items .category-icon { background: linear-gradient(135deg, #60a5fa, #2563eb); }
+.category-card.by-priority .category-icon { background: linear-gradient(135deg, #fdba74, #f97316); }
+.category-card.by-category .category-icon { background: linear-gradient(135deg, #fb7185, #ef4444); }
 
 .category-title {
     font-size: 20px;
@@ -443,14 +451,14 @@ body.home-page .top-header {
 }
 
 .category-description {
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.92);
     font-size: 14px;
     margin-bottom: 16px;
-    line-height: 1.4;
+    line-height: 1.5;
 }
 
 .category-count {
-    color: rgba(255, 255, 255, 0.9);
+    color: rgba(255, 255, 255, 1);
     font-size: 16px;
     font-weight: 600;
 }
@@ -551,6 +559,14 @@ body.home-page .top-header {
 .product-actions {
     display: flex;
     gap: 8px;
+}
+
+.product-link {
+    margin-top: 8px;
+}
+
+.btn-block {
+    width: 100%;
 }
 
 .btn {
