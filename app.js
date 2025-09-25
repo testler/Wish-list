@@ -6,6 +6,10 @@
     let searchQuery = '';
     let items = [];
     let projects = [];
+    let isAdmin = false;
+    let adminSection = 'items'; // or 'projects'
+    let secretTapCount = 0;
+    let lastSecretTapTs = 0;
 
     // Remote data source (JSONBin)
     // Set one of these to your JSONBin endpoint(s). If JSONBIN_URL is provided, it should
@@ -26,6 +30,353 @@
         } catch {
             return { items: [], projects: [] };
         }
+    }
+
+    // Admin: login screen
+    function renderAdminLogin() {
+        contentArea.innerHTML = `
+            <div class="admin-login-card">
+                <div class="admin-login-icon">🔒</div>
+                <h2 class="admin-login-title">Admin Access</h2>
+                <p class="admin-login-subtitle">Enter your password to manage the wishlist</p>
+                <div class="form-group">
+                    <label class="form-label" for="admin-pass">Password</label>
+                    <div class="admin-pass-wrap">
+                        <input id="admin-pass" type="password" class="form-input" placeholder="••••••" />
+                    </div>
+                    <div id="admin-error" class="admin-error hidden">Invalid password</div>
+                </div>
+                <button id="admin-login-btn" class="btn btn-primary btn-block">Login to Admin</button>
+            </div>
+        `;
+
+        const passInput = document.getElementById('admin-pass');
+        const loginBtn = document.getElementById('admin-login-btn');
+        const errorEl = document.getElementById('admin-error');
+
+        function tryLogin() {
+            const val = (passInput.value || '').trim();
+            if (val.toLowerCase() === 'secrect') { // per request exact word
+                isAdmin = true;
+                localStorage.setItem('wishlist-admin', 'true');
+                navigateTo('admin');
+            } else {
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        loginBtn.addEventListener('click', tryLogin);
+        passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
+    }
+
+    // Admin: dashboard
+    function renderAdminDashboard() {
+        contentArea.innerHTML = `
+            <div class="admin-header">
+                <h1 class="page-title">Admin Dashboard</h1>
+                <button id="admin-logout" class="btn btn-secondary">Logout</button>
+            </div>
+
+            <div class="admin-tabs">
+                <button class="admin-tab ${adminSection === 'items' ? 'active' : ''}" data-tab="items">Manage Items</button>
+                <button class="admin-tab ${adminSection === 'projects' ? 'active' : ''}" data-tab="projects">Manage Projects</button>
+            </div>
+
+            <div class="admin-section">
+                ${adminSection === 'items' ? renderAdminItems() : renderAdminProjects()}
+            </div>
+        `;
+
+        document.getElementById('admin-logout').addEventListener('click', () => {
+            isAdmin = false;
+            localStorage.removeItem('wishlist-admin');
+            navigateTo('home');
+        });
+
+        document.querySelectorAll('.admin-tab').forEach(btn => {
+            btn.addEventListener('click', () => {
+                adminSection = btn.getAttribute('data-tab');
+                renderAdminDashboard();
+            });
+        });
+        // Wire item add
+        const addItemBtn = document.getElementById('add-item');
+        if (addItemBtn) {
+            addItemBtn.addEventListener('click', async () => {
+                const title = document.getElementById('new-name').value.trim();
+                const price = parseFloat(document.getElementById('new-price').value || '0');
+                const description = document.getElementById('new-desc').value.trim();
+                const image = document.getElementById('new-image').value.trim();
+                const rank = (document.getElementById('new-rank').value || 'A').toUpperCase();
+                const project = document.getElementById('new-project').value;
+                const vendor = document.getElementById('new-vendor').value.trim();
+                const link = document.getElementById('new-link').value.trim();
+                const purchased = document.getElementById('new-purchased').checked;
+
+                if (!title) return toast('Name is required');
+
+                const newItem = {
+                    id: `item-${Date.now()}`,
+                    title,
+                    price: isNaN(price) ? 0 : price,
+                    description,
+                    image,
+                    rank,
+                    project,
+                    vendor,
+                    url: link,
+                    purchased
+                };
+                items.push(newItem);
+                try {
+                    await updateJSONBin();
+                    toast('Item added');
+                    renderAdminDashboard();
+                } catch {
+                    toast('Failed to save');
+                }
+            });
+        }
+
+        // Wire edit/delete for items
+        document.querySelectorAll('[data-del]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const idx = Number(btn.getAttribute('data-del'));
+                items.splice(idx, 1);
+                try { await updateJSONBin(); toast('Item deleted'); renderAdminDashboard(); } catch { toast('Failed to delete'); }
+            });
+        });
+
+        document.querySelectorAll('[data-edit]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-edit'));
+                openItemEdit(idx);
+            });
+        });
+
+        // Wire project add
+        const addProjectBtn = document.getElementById('add-project');
+        if (addProjectBtn) {
+            addProjectBtn.addEventListener('click', async () => {
+                const name = document.getElementById('proj-name').value.trim();
+                const description = document.getElementById('proj-desc').value.trim();
+                const icon = document.getElementById('proj-icon').value.trim() || '📁';
+                const color = document.getElementById('proj-color').value.trim() || '#f97316';
+                const projectIconImage = document.getElementById('proj-image').value.trim();
+                if (!name) return toast('Project name is required');
+                projects.push({ id: name.toLowerCase().replace(/\s+/g, '-'), name, description, icon, color, ['project-icon-image']: projectIconImage });
+                try { await updateJSONBin(); toast('Project added'); renderAdminDashboard(); } catch { toast('Failed to save'); }
+            });
+        }
+
+        // Wire edit/delete for projects
+        document.querySelectorAll('[data-del-proj]').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const idx = Number(btn.getAttribute('data-del-proj'));
+                projects.splice(idx, 1);
+                try { await updateJSONBin(); toast('Project deleted'); renderAdminDashboard(); } catch { toast('Failed to delete'); }
+            });
+        });
+
+        document.querySelectorAll('[data-edit-proj]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = Number(btn.getAttribute('data-edit-proj'));
+                openProjectEdit(idx);
+            });
+        });
+    }
+
+    function openItemEdit(index) {
+        const it = items[index];
+        if (!it) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal';
+        overlay.innerHTML = `
+            <div class="modal-dialog">
+                <header class="modal-header">
+                    <h2 class="modal-title">Edit Item</h2>
+                    <button class="modal-close" id="edit-close">×</button>
+                </header>
+                <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Name</label><input id="e-name" class="form-input" value="${it.title}" /></div>
+                    <div class="form-group"><label class="form-label">Price</label><input id="e-price" type="number" step="0.01" class="form-input" value="${Number(it.price || 0)}" /></div>
+                    <div class="form-group"><label class="form-label">Rank</label><input id="e-rank" class="form-input" value="${it.rank || 'A'}" /></div>
+                    <div class="form-group"><label class="form-label">Image</label><input id="e-image" class="form-input" value="${it.image || ''}" /></div>
+                    <div class="form-group"><label class="form-label">Link</label><input id="e-link" class="form-input" value="${it.url || ''}" /></div>
+                    <div class="form-group"><label class="form-label">Vendor</label><input id="e-vendor" class="form-input" value="${it.vendor || ''}" /></div>
+                    <div class="form-group"><label class="form-label">Project</label>
+                        <select id="e-project" class="form-input">${projects.map(p => `<option value="${p.id}" ${p.id===it.project?'selected':''}>${p.name}</option>`).join('')}</select>
+                    </div>
+                    <div class="form-group"><label class="form-label">Purchased</label><input id="e-purchased" type="checkbox" ${it.purchased?'checked':''} /></div>
+                    <div class="form-actions"><button id="e-save" class="btn btn-primary">Save</button></div>
+                </div>
+            </div>`;
+
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector('#edit-close').addEventListener('click', () => overlay.remove());
+        overlay.querySelector('#e-save').addEventListener('click', async () => {
+            it.title = overlay.querySelector('#e-name').value.trim() || it.title;
+            it.price = parseFloat(overlay.querySelector('#e-price').value || it.price) || 0;
+            it.rank = (overlay.querySelector('#e-rank').value || it.rank).toUpperCase();
+            it.image = overlay.querySelector('#e-image').value.trim();
+            it.url = overlay.querySelector('#e-link').value.trim();
+            it.vendor = overlay.querySelector('#e-vendor').value.trim();
+            it.project = overlay.querySelector('#e-project').value;
+            it.purchased = overlay.querySelector('#e-purchased').checked;
+            try { await updateJSONBin(); toast('Item updated'); renderAdminDashboard(); } catch { toast('Failed to save'); }
+            overlay.remove();
+        });
+    }
+
+    function openProjectEdit(index) {
+        const p = projects[index];
+        if (!p) return;
+        const overlay = document.createElement('div');
+        overlay.className = 'modal';
+        overlay.innerHTML = `
+            <div class="modal-dialog">
+                <header class="modal-header">
+                    <h2 class="modal-title">Edit Project</h2>
+                    <button class="modal-close" id="p-edit-close">×</button>
+                </header>
+                <div class="modal-body">
+                    <div class="form-group"><label class="form-label">Name</label><input id="p-name" class="form-input" value="${p.name}" /></div>
+                    <div class="form-group"><label class="form-label">Description</label><textarea id="p-desc" class="form-input" rows="3">${p.description || ''}</textarea></div>
+                    <div class="form-group"><label class="form-label">Icon</label><input id="p-icon" class="form-input" value="${p.icon || '📁'}" /></div>
+                    <div class="form-group"><label class="form-label">Color</label><input id="p-color" class="form-input" value="${p.color || '#f97316'}" /></div>
+                    <div class="form-group"><label class="form-label">Project Icon Image (URL)</label><input id="p-image" class="form-input" value="${p['project-icon-image'] || ''}" /></div>
+                    <div class="form-actions"><button id="p-save" class="btn btn-primary">Save</button></div>
+                </div>
+            </div>`;
+        document.body.appendChild(overlay);
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+        overlay.querySelector('#p-edit-close').addEventListener('click', () => overlay.remove());
+        overlay.querySelector('#p-save').addEventListener('click', async () => {
+            p.name = overlay.querySelector('#p-name').value.trim() || p.name;
+            p.description = overlay.querySelector('#p-desc').value.trim();
+            p.icon = overlay.querySelector('#p-icon').value.trim() || p.icon;
+            p.color = overlay.querySelector('#p-color').value.trim() || p.color;
+            p['project-icon-image'] = overlay.querySelector('#p-image').value.trim();
+            try { await updateJSONBin(); toast('Project updated'); renderAdminDashboard(); } catch { toast('Failed to save'); }
+            overlay.remove();
+        });
+    }
+
+
+    function renderAdminItems() {
+        const projectOptions = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+
+        return `
+            <div class="admin-card">
+                <h2 class="section-title">Add New Item</h2>
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input id="new-name" class="form-input" placeholder="Item name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Price *</label>
+                    <input id="new-price" type="number" step="0.01" min="0" class="form-input" value="0" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="new-desc" class="form-input" rows="3" placeholder="Describe the item"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Image URL</label>
+                    <input id="new-image" class="form-input" placeholder="https://..." />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority Rank</label>
+                    <input id="new-rank" class="form-input" value="A" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Project</label>
+                    <select id="new-project" class="form-input">
+                        <option value="">Select a project</option>
+                        ${projectOptions}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Store</label>
+                    <input id="new-vendor" class="form-input" placeholder="Amazon, Target, etc." />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Link (optional)</label>
+                    <input id="new-link" class="form-input" placeholder="https://..." />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Already purchased</label>
+                    <input id="new-purchased" type="checkbox" />
+                </div>
+                <button id="add-item" class="btn btn-primary">Add Item</button>
+            </div>
+
+            <div class="admin-card">
+                <h2 class="section-title">Existing Items</h2>
+                <div class="admin-list">
+                    ${items.map((it, idx) => `
+                        <div class="admin-list-row">
+                            <div class="admin-list-main">
+                                <div class="admin-list-title">${it.title}</div>
+                                <div class="admin-list-sub">$${Number(it.price || 0).toFixed(2)} · ${it.vendor || 'Unknown'}</div>
+                            </div>
+                            <div class="admin-list-actions">
+                                <button class="btn btn-secondary" data-edit="${idx}">Edit</button>
+                                <button class="btn btn-secondary" data-del="${idx}">Delete</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+    }
+
+    function renderAdminProjects() {
+        return `
+            <div class="admin-card">
+                <h2 class="section-title">Add New Project</h2>
+                <div class="form-group">
+                    <label class="form-label">Name *</label>
+                    <input id="proj-name" class="form-input" placeholder="Project name" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Description</label>
+                    <textarea id="proj-desc" class="form-input" rows="3" placeholder="Describe the project"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Icon (emoji)</label>
+                    <input id="proj-icon" class="form-input" placeholder="📦" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Color (hex)</label>
+                    <input id="proj-color" class="form-input" placeholder="#ff8800" />
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Project Icon Image (URL)</label>
+                    <input id="proj-image" class="form-input" placeholder="https://..." />
+                </div>
+                <button id="add-project" class="btn btn-primary">Add Project</button>
+            </div>
+
+            <div class="admin-card">
+                <h2 class="section-title">Existing Projects</h2>
+                <div class="admin-list">
+                    ${projects.map((p, idx) => `
+                        <div class="admin-list-row">
+                            <div class="admin-list-main">
+                                <div class="admin-list-title">${p.name}</div>
+                                <div class="admin-list-sub">${p.description || ''}</div>
+                            </div>
+                            <div class="admin-list-actions">
+                                <button class="btn btn-secondary" data-edit-proj="${idx}">Edit</button>
+                                <button class="btn btn-secondary" data-del-proj="${idx}">Delete</button>
+                            </div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
     }
 
     // No local sample items – will be fetched
@@ -49,6 +400,8 @@
         await loadData();
         bindEvents();
         initRouting();
+        // Load admin session
+        isAdmin = localStorage.getItem('wishlist-admin') === 'true';
         render();
     }
 
@@ -187,7 +540,12 @@
             return; // Don't navigate to same route
         }
         
-        currentRoute = route;
+        // Gate admin dashboard
+        if (route === 'admin' && !isAdmin) {
+            currentRoute = 'admin-login';
+        } else {
+            currentRoute = route;
+        }
         console.log(`Route changed to: ${currentRoute}`);
         updateActiveNavItem();
         
@@ -323,6 +681,13 @@
             case 'home':
                 renderHome();
                 break;
+            case 'admin-login':
+                renderAdminLogin();
+                break;
+            case 'admin':
+                if (!isAdmin) { renderAdminLogin(); break; }
+                renderAdminDashboard();
+                break;
             case 'under-20':
                 renderUnder20();
                 break;
@@ -359,7 +724,7 @@
 
         contentArea.innerHTML = `
             <div class="home-hero">
-                <div class="hero-icon">🎁</div>
+                <div class="hero-icon" id="secret-hero">🎁</div>
                 <h1 class="hero-title">Josh's Wishlist</h1>
                 <p class="hero-subtitle">A curated collection of birthday wishes organized just for you</p>
             </div>
@@ -417,6 +782,23 @@
                 }
             });
         });
+
+        // Secret 5-tap to open admin
+        const secretHero = document.getElementById('secret-hero');
+        if (secretHero) {
+            secretHero.addEventListener('click', () => {
+                const now = Date.now();
+                if (now - lastSecretTapTs > 2000) {
+                    secretTapCount = 0; // reset if more than 2s passed
+                }
+                lastSecretTapTs = now;
+                secretTapCount += 1;
+                if (secretTapCount >= 5) {
+                    secretTapCount = 0;
+                    navigateTo('admin-login');
+                }
+            });
+        }
     }
 
     // Render under $20 items
