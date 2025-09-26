@@ -1,1278 +1,438 @@
 (() => {
     'use strict';
 
-    // App State
-    let currentRoute = 'home';
-    let searchQuery = '';
-    let items = [];
-    let projects = [];
-    let isAdmin = false;
-    let adminSection = 'items'; // or 'projects'
-    let secretTapCount = 0;
-    let lastSecretTapTs = 0;
+    // State
+    let route = 'home', query = '', items = [], projects = [], admin = false, adminTab = 'items';
+    let adminSecret = 'secret';
+    let taps = 0, lastTap = 0, purchaseId = null;
 
-    // Sound effects - simple approach
-    function playSfx(soundFile) {
+    // Config
+    const API_URL = 'https://api.jsonbin.io/v3/b/68bd0199ae596e708fe558a8/latest';
+    const KEY = '$2a$10$qCWunkuQ.RvrVSMrdAzXA.h.BWSmvB6NkAIaEXVd5rUQ7E4RzwCyq';
+
+    // Utils
+    const $ = id => document.getElementById(id);
+    const $$ = sel => document.querySelectorAll(sel);
+    const toast = msg => {
+        const el = document.createElement('div');
+        el.className = 'toast';
+        el.textContent = msg;
+        $('toast-stack').appendChild(el);
+        setTimeout(() => el.remove(), 3000);
+    };
+    const sfx = file => {
         try {
-            const audio = new Audio(soundFile);
-            audio.volume = 0.01;
-            audio.play().catch(() => {}); // ignore autoplay failures
-        } catch (e) {
-            console.warn('SFX play failed', e);
-        }
-    }
+            const a = new Audio(file);
+            a.volume = 0.05;
+            a.play().catch(() => {});
+        } catch {}
+    };
 
-    // Remote data source (JSONBin)
-    // Set one of these to your JSONBin endpoint(s). If JSONBIN_URL is provided, it should
-    // return an object with shape: { items: Item[], projects: Project[] }
-    // If you prefer separate bins, set JSONBIN_ITEMS_URL and/or JSONBIN_PROJECTS_URL instead.
-    const JSONBIN_URL = 'https://api.jsonbin.io/v3/b/68bd0199ae596e708fe558a8/latest';
-    const JSONBIN_ITEMS_URL = '';
-    const JSONBIN_PROJECTS_URL = '';
-    const JSONBIN_KEY = '$2a$10$qCWunkuQ.RvrVSMrdAzXA.h.BWSmvB6NkAIaEXVd5rUQ7E4RzwCyq'; // X-Access-Key for JSONBin
-
-    // No local samples – data will be fetched from JSONBin or loaded from localStorage
-
-    function readLocal() {
+    // Data
+    const load = async () => {
         try {
-            const ii = JSON.parse(localStorage.getItem('wishlist-items') || '[]');
-            const pp = JSON.parse(localStorage.getItem('wishlist-projects') || '[]');
-            return { items: Array.isArray(ii) ? ii : [], projects: Array.isArray(pp) ? pp : [] };
+            const res = await fetch(API_URL, { headers: { 'X-Access-Key': KEY } });
+            if (res.ok) {
+                const data = (await res.json()).record || {};
+                items = data.items || [];
+                projects = data.projects || [];
+                adminSecret = (data.secret || data.adminSecret || localStorage.getItem('wishlist-secret') || 'secret').toString();
+            } else throw new Error();
         } catch {
-            return { items: [], projects: [] };
+            const saved = JSON.parse(localStorage.getItem('wishlist-items') || '[]');
+            const savedProj = JSON.parse(localStorage.getItem('wishlist-projects') || '[]');
+            const savedSecret = localStorage.getItem('wishlist-secret') || 'secret';
+            items = saved;
+            projects = savedProj;
+            adminSecret = savedSecret;
         }
-    }
-
-    // Admin: login screen
-    function renderAdminLogin() {
-        contentArea.innerHTML = `
-            <div class="admin-login-card">
-                <div class="admin-login-icon">🔒</div>
-                <h2 class="admin-login-title">Admin Access</h2>
-                <p class="admin-login-subtitle">Enter your password to manage the wishlist</p>
-                <div class="form-group">
-                    <label class="form-label" for="admin-pass">Password</label>
-                    <div class="admin-pass-wrap">
-                        <input id="admin-pass" type="password" class="form-input" placeholder="••••••" />
-                    </div>
-                    <div id="admin-error" class="admin-error hidden">Invalid password</div>
-                </div>
-                <button id="admin-login-btn" class="btn btn-primary btn-block">Login to Admin</button>
-            </div>
-        `;
-
-        const passInput = document.getElementById('admin-pass');
-        const loginBtn = document.getElementById('admin-login-btn');
-        const errorEl = document.getElementById('admin-error');
-
-        function tryLogin() {
-            const val = (passInput.value || '').trim();
-            if (val.toLowerCase() === 'secret') { // per request exact word
-                playSfx('secret');
-                isAdmin = true;
-                localStorage.setItem('wishlist-admin', 'true');
-                navigateTo('admin');
-            } else {
-                errorEl.classList.remove('hidden');
-            }
-        }
-
-        loginBtn.addEventListener('click', tryLogin);
-        passInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') tryLogin(); });
-    }
-
-    // Admin: dashboard
-    function renderAdminDashboard() {
-        contentArea.innerHTML = `
-            <div class="admin-header">
-                <h1 class="page-title">Admin Dashboard</h1>
-                <button id="admin-logout" class="btn btn-secondary">Logout</button>
-            </div>
-
-            <div class="admin-tabs">
-                <button class="admin-tab ${adminSection === 'items' ? 'active' : ''}" data-tab="items">Manage Items</button>
-                <button class="admin-tab ${adminSection === 'projects' ? 'active' : ''}" data-tab="projects">Manage Projects</button>
-            </div>
-
-            <div class="admin-section">
-                ${adminSection === 'items' ? renderAdminItems() : renderAdminProjects()}
-            </div>
-        `;
-
-        document.getElementById('admin-logout').addEventListener('click', () => {
-            isAdmin = false;
-            localStorage.removeItem('wishlist-admin');
-            navigateTo('home');
-        });
-
-        document.querySelectorAll('.admin-tab').forEach(btn => {
-            btn.addEventListener('click', () => {
-                adminSection = btn.getAttribute('data-tab');
-                renderAdminDashboard();
-            });
-        });
-        // Wire item add
-        const addItemBtn = document.getElementById('add-item');
-        if (addItemBtn) {
-            addItemBtn.addEventListener('click', async () => {
-                const title = document.getElementById('new-name').value.trim();
-                const price = parseFloat(document.getElementById('new-price').value || '0');
-                const description = document.getElementById('new-desc').value.trim();
-                const image = document.getElementById('new-image').value.trim();
-                const rank = (document.getElementById('new-rank').value || 'A').toUpperCase();
-                const project = document.getElementById('new-project').value;
-                const vendor = document.getElementById('new-vendor').value.trim();
-                const link = document.getElementById('new-link').value.trim();
-                const purchased = document.getElementById('new-purchased').checked;
-
-                if (!title) return toast('Name is required');
-
-                const newItem = {
-                    id: `item-${Date.now()}`,
-                    title,
-                    price: isNaN(price) ? 0 : price,
-                    description,
-                    image,
-                    rank,
-                    project,
-                    vendor,
-                    url: link,
-                    purchased
-                };
-                items.push(newItem);
-                try {
-                    await updateJSONBin();
-                    toast('Item added');
-                    renderAdminDashboard();
-                } catch {
-                    toast('Failed to save');
-                }
-            });
-        }
-
-        // Wire edit/delete for items
-        document.querySelectorAll('[data-del]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const idx = Number(btn.getAttribute('data-del'));
-                items.splice(idx, 1);
-                try { await updateJSONBin(); toast('Item deleted'); renderAdminDashboard(); } catch { toast('Failed to delete'); }
-            });
-        });
-
-        document.querySelectorAll('[data-edit]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = Number(btn.getAttribute('data-edit'));
-                openItemEdit(idx);
-            });
-        });
-
-        // Wire project add
-        const addProjectBtn = document.getElementById('add-project');
-        if (addProjectBtn) {
-            addProjectBtn.addEventListener('click', async () => {
-                const name = document.getElementById('proj-name').value.trim();
-                const description = document.getElementById('proj-desc').value.trim();
-                const icon = document.getElementById('proj-icon').value.trim() || '📁';
-                const color = document.getElementById('proj-color').value.trim() || '#f97316';
-                const projectIconImage = document.getElementById('proj-image').value.trim();
-                if (!name) return toast('Project name is required');
-                projects.push({ id: name.toLowerCase().replace(/\s+/g, '-'), name, description, icon, color, ['project-icon-image']: projectIconImage });
-                try { await updateJSONBin(); toast('Project added'); renderAdminDashboard(); } catch { toast('Failed to save'); }
-            });
-        }
-
-        // Wire edit/delete for projects
-        document.querySelectorAll('[data-del-proj]').forEach(btn => {
-            btn.addEventListener('click', async () => {
-                const idx = Number(btn.getAttribute('data-del-proj'));
-                projects.splice(idx, 1);
-                try { await updateJSONBin(); toast('Project deleted'); renderAdminDashboard(); } catch { toast('Failed to delete'); }
-            });
-        });
-
-        document.querySelectorAll('[data-edit-proj]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = Number(btn.getAttribute('data-edit-proj'));
-                openProjectEdit(idx);
-            });
-        });
-    }
-
-    function openItemEdit(index) {
-        const it = items[index];
-        if (!it) return;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal';
-        overlay.innerHTML = `
-            <div class="modal-dialog">
-                <header class="modal-header">
-                    <h2 class="modal-title">Edit Item</h2>
-                    <button class="modal-close" id="edit-close">×</button>
-                </header>
-                <div class="modal-body">
-                    <div class="form-group"><label class="form-label">Name</label><input id="e-name" class="form-input" value="${it.title}" /></div>
-                    <div class="form-group"><label class="form-label">Price</label><input id="e-price" type="number" step="0.01" class="form-input" value="${Number(it.price || 0)}" /></div>
-                    <div class="form-group"><label class="form-label">Rank</label><input id="e-rank" class="form-input" value="${it.rank || 'A'}" /></div>
-                    <div class="form-group"><label class="form-label">Image</label><input id="e-image" class="form-input" value="${it.image || ''}" /></div>
-                    <div class="form-group"><label class="form-label">Link</label><input id="e-link" class="form-input" value="${it.url || ''}" /></div>
-                    <div class="form-group"><label class="form-label">Vendor</label><input id="e-vendor" class="form-input" value="${it.vendor || ''}" /></div>
-                    <div class="form-group"><label class="form-label">Project</label>
-                        <select id="e-project" class="form-input">${projects.map(p => `<option value="${p.id}" ${p.id===it.project?'selected':''}>${p.name}</option>`).join('')}</select>
-                    </div>
-                    <div class="form-group"><label class="form-label">Purchased</label><input id="e-purchased" type="checkbox" ${it.purchased?'checked':''} /></div>
-                    <div class="form-actions"><button id="e-save" class="btn btn-primary">Save</button></div>
-                </div>
-            </div>`;
-
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('#edit-close').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#e-save').addEventListener('click', async () => {
-            it.title = overlay.querySelector('#e-name').value.trim() || it.title;
-            it.price = parseFloat(overlay.querySelector('#e-price').value || it.price) || 0;
-            it.rank = (overlay.querySelector('#e-rank').value || it.rank).toUpperCase();
-            it.image = overlay.querySelector('#e-image').value.trim();
-            it.url = overlay.querySelector('#e-link').value.trim();
-            it.vendor = overlay.querySelector('#e-vendor').value.trim();
-            it.project = overlay.querySelector('#e-project').value;
-            it.purchased = overlay.querySelector('#e-purchased').checked;
-            try { await updateJSONBin(); toast('Item updated'); renderAdminDashboard(); } catch { toast('Failed to save'); }
-            overlay.remove();
-        });
-    }
-
-    function openProjectEdit(index) {
-        const p = projects[index];
-        if (!p) return;
-        const overlay = document.createElement('div');
-        overlay.className = 'modal';
-        overlay.innerHTML = `
-            <div class="modal-dialog">
-                <header class="modal-header">
-                    <h2 class="modal-title">Edit Project</h2>
-                    <button class="modal-close" id="p-edit-close">×</button>
-                </header>
-                <div class="modal-body">
-                    <div class="form-group"><label class="form-label">Name</label><input id="p-name" class="form-input" value="${p.name}" /></div>
-                    <div class="form-group"><label class="form-label">Description</label><textarea id="p-desc" class="form-input" rows="3">${p.description || ''}</textarea></div>
-                    <div class="form-group"><label class="form-label">Icon</label><input id="p-icon" class="form-input" value="${p.icon || '📁'}" /></div>
-                    <div class="form-group"><label class="form-label">Color</label><input id="p-color" class="form-input" value="${p.color || '#f97316'}" /></div>
-                    <div class="form-group"><label class="form-label">Project Icon Image (URL)</label><input id="p-image" class="form-input" value="${p['project-icon-image'] || ''}" /></div>
-                    <div class="form-actions"><button id="p-save" class="btn btn-primary">Save</button></div>
-                </div>
-            </div>`;
-        document.body.appendChild(overlay);
-        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
-        overlay.querySelector('#p-edit-close').addEventListener('click', () => overlay.remove());
-        overlay.querySelector('#p-save').addEventListener('click', async () => {
-            p.name = overlay.querySelector('#p-name').value.trim() || p.name;
-            p.description = overlay.querySelector('#p-desc').value.trim();
-            p.icon = overlay.querySelector('#p-icon').value.trim() || p.icon;
-            p.color = overlay.querySelector('#p-color').value.trim() || p.color;
-            p['project-icon-image'] = overlay.querySelector('#p-image').value.trim();
-            try { await updateJSONBin(); toast('Project updated'); renderAdminDashboard(); } catch { toast('Failed to save'); }
-            overlay.remove();
-        });
-    }
-
-
-    function renderAdminItems() {
-        const projectOptions = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
-
-        return `
-            <div class="admin-card">
-                <h2 class="section-title">Add New Item</h2>
-                <div class="form-group">
-                    <label class="form-label">Name *</label>
-                    <input id="new-name" class="form-input" placeholder="Item name" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Price *</label>
-                    <input id="new-price" type="number" step="0.01" min="0" class="form-input" value="0" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea id="new-desc" class="form-input" rows="3" placeholder="Describe the item"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Image URL</label>
-                    <input id="new-image" class="form-input" placeholder="https://..." />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Priority Rank</label>
-                    <input id="new-rank" class="form-input" value="A" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Project</label>
-                    <select id="new-project" class="form-input">
-                        <option value="">Select a project</option>
-                        ${projectOptions}
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Store</label>
-                    <input id="new-vendor" class="form-input" placeholder="Amazon, Target, etc." />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Link (optional)</label>
-                    <input id="new-link" class="form-input" placeholder="https://..." />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Already purchased</label>
-                    <input id="new-purchased" type="checkbox" />
-                </div>
-                <button id="add-item" class="btn btn-primary">Add Item</button>
-            </div>
-
-            <div class="admin-card">
-                <h2 class="section-title">Existing Items</h2>
-                <div class="admin-list">
-                    ${items.map((it, idx) => `
-                        <div class="admin-list-row">
-                            <div class="admin-list-main">
-                                <div class="admin-list-title">${it.title}</div>
-                                <div class="admin-list-sub">$${Number(it.price || 0).toFixed(2)} · ${it.vendor || 'Unknown'}</div>
-                            </div>
-                            <div class="admin-list-actions">
-                                <button class="btn btn-secondary" data-edit="${idx}">Edit</button>
-                                <button class="btn btn-secondary" data-del="${idx}">Delete</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    function renderAdminProjects() {
-        return `
-            <div class="admin-card">
-                <h2 class="section-title">Add New Project</h2>
-                <div class="form-group">
-                    <label class="form-label">Name *</label>
-                    <input id="proj-name" class="form-input" placeholder="Project name" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Description</label>
-                    <textarea id="proj-desc" class="form-input" rows="3" placeholder="Describe the project"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Icon (emoji)</label>
-                    <input id="proj-icon" class="form-input" placeholder="📦" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Color (hex)</label>
-                    <input id="proj-color" class="form-input" placeholder="#ff8800" />
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Project Icon Image (URL)</label>
-                    <input id="proj-image" class="form-input" placeholder="https://..." />
-                </div>
-                <button id="add-project" class="btn btn-primary">Add Project</button>
-            </div>
-
-            <div class="admin-card">
-                <h2 class="section-title">Existing Projects</h2>
-                <div class="admin-list">
-                    ${projects.map((p, idx) => `
-                        <div class="admin-list-row">
-                            <div class="admin-list-main">
-                                <div class="admin-list-title">${p.name}</div>
-                                <div class="admin-list-sub">${p.description || ''}</div>
-                            </div>
-                            <div class="admin-list-actions">
-                                <button class="btn btn-secondary" data-edit-proj="${idx}">Edit</button>
-                                <button class="btn btn-secondary" data-del-proj="${idx}">Delete</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>
-        `;
-    }
-
-    // No local sample items – will be fetched
-
-    // DOM Elements
-    const menuBtn = document.getElementById('menu-btn');
-    const navOverlay = document.getElementById('nav-overlay');
-    const closeNavBtn = document.querySelector('.close-nav');
-    const navItems = document.querySelectorAll('.nav-item');
-    const contentArea = document.getElementById('content-area');
-    const searchInput = document.getElementById('global-search');
-    const purchaseModal = document.getElementById('purchase-modal');
-    const purchaseModalClose = document.getElementById('purchase-modal-close');
-    const purchaseCancel = document.getElementById('purchase-cancel');
-    const purchaseConfirm = document.getElementById('purchase-confirm');
-    let itemToPurchase = null;
-    const homeTitle = document.getElementById('home-title');
-
-    // Initialize App
-    async function init() {
-        await loadData();
-        bindEvents();
-        initRouting();
-        // Load admin session
-        isAdmin = localStorage.getItem('wishlist-admin') === 'true';
-        render();
-    }
-
-    // Initialize routing from URL
-    function initRouting() {
-        const urlParams = new URLSearchParams(window.location.search);
-        const route = urlParams.get('route');
-        if (route) {
-            currentRoute = route;
-        }
-
-        // Set initial history state
-        window.history.replaceState({ route: currentRoute }, '', window.location.href);
-
-        // Listen for browser back/forward
-        window.addEventListener('popstate', (event) => {
-            if (event.state && event.state.route) {
-                currentRoute = event.state.route;
-                updateActiveNavItem();
-                    render();
-            } else {
-                // Fallback if no state
-                const urlParams = new URLSearchParams(window.location.search);
-                const route = urlParams.get('route') || 'home';
-                currentRoute = route;
-                updateActiveNavItem();
-                render();
-                }
-            });
-        }
-
-    // Load data ALWAYS from JSONBin first, then cache locally
-    async function loadData() {
-        try {
-            const headers = {
-                'X-Access-Key': JSONBIN_KEY
-            };
-            console.log('Fetching from JSONBin...', JSONBIN_URL);
-            console.log('Using headers:', headers);
-            
-            const res = await fetch(JSONBIN_URL, { headers });
-            console.log('Response status:', res.status, res.statusText);
-            
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-            
-            const raw = await res.json();
-            console.log('JSONBin response:', raw);
-            
-            // JSONBin v3 wraps payload in { record: {...} }
-            const data = raw && raw.record ? raw.record : raw;
-            items = Array.isArray(data.items) ? data.items : [];
-            projects = Array.isArray(data.projects) ? data.projects : [];
-            
-            console.log(`Loaded ${items.length} items and ${projects.length} projects from JSONBin`);
-                await saveData();
-        } catch (e) {
-            console.error('Failed to fetch JSONBin data:', e);
-            // Fallback to cached data only if JSONBin fails
-            const saved = readLocal();
-            items = saved.items;
-            projects = saved.projects;
-            console.log(`Fallback: using cached ${items.length} items and ${projects.length} projects`);
-        }
-    }
-
-    // Save data to localStorage
-    function saveData() {
+        
+        // Heal missing projects
+        const projIds = new Set(projects.map(p => p.id));
+        const missing = new Set();
+        items.forEach(i => i.project && !projIds.has(i.project) && missing.add(i.project));
+        missing.forEach(id => projects.push({
+            id, name: id.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+            description: 'Auto-created', icon: '📦', color: '#f97316'
+        }));
+        
         localStorage.setItem('wishlist-items', JSON.stringify(items));
         localStorage.setItem('wishlist-projects', JSON.stringify(projects));
-    }
+        localStorage.setItem('wishlist-secret', adminSecret);
+    };
 
-    // Bind event listeners
-    function bindEvents() {
-        // Navigation
-        menuBtn.addEventListener('click', toggleNav);
-        closeNavBtn.addEventListener('click', closeNav);
-        navOverlay.addEventListener('click', (e) => {
-            if (e.target === navOverlay) closeNav();
+    const save = async () => {
+        const res = await fetch(API_URL.replace('/latest', ''), {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Access-Key': KEY },
+            body: JSON.stringify({ items, projects, secret: adminSecret })
         });
+        if (!res.ok) throw new Error();
+        localStorage.setItem('wishlist-items', JSON.stringify(items));
+        localStorage.setItem('wishlist-projects', JSON.stringify(projects));
+        localStorage.setItem('wishlist-secret', adminSecret);
+    };
 
-        navItems.forEach(item => {
-            item.addEventListener('click', (e) => {
-                const route = e.currentTarget.getAttribute('data-route');
-                navigateTo(route);
-                closeNav();
-            });
-        });
-
-        // Search
-        searchInput.addEventListener('input', (e) => {
-            searchQuery = e.target.value.trim();
+    // Navigation
+    const nav = to => {
+        if (route === to) return;
+        if (to === 'admin' && !admin) to = 'admin-login';
+        route = to;
+        
+        const url = new window.URL(window.location.href);
+        to === 'home' ? url.searchParams.delete('route') : url.searchParams.set('route', to);
+        history.pushState({ route: to }, '', url);
+        
+        $$('.nav-item').forEach(i => i.classList.toggle('is-active', i.dataset.route === route));
             render();
-        });
+    };
 
-        // Purchase modal
-        purchaseModalClose.addEventListener('click', closePurchaseModal);
-        purchaseCancel.addEventListener('click', closePurchaseModal);
-        purchaseConfirm.addEventListener('click', confirmPurchase);
-        purchaseModal.addEventListener('click', (e) => {
-            if (e.target === purchaseModal) closePurchaseModal();
-        });
+    // Rendering
+    const cards = list => list.map(item => {
+        const bought = item.purchased;
+        const url = item.url || (item.links?.length ? item.links[0].url : 'https://amazon.com');
+        const domain = url.split('/')[2] || 'amazon.com';
+        
+        return `<div class="product-card${bought ? ' purchased' : ''}">
+            <div class="product-image">
+                ${item.image ? `<img src="${item.image}" alt="${item.title}" onerror="this.onerror=null; this.style.display='none'; if (this.nextElementSibling) { this.nextElementSibling.style.display='flex'; }"><div class="placeholder" style="display:none">📦</div>` : '<div class="placeholder">📦</div>'}
+                <div class="rank-badge rank-${item.rank}">${item.rank}</div>
+            </div>
+            <div class="product-info">
+                <div class="product-header">
+                    <h3 class="product-title">${item.title}</h3>
+                    <div class="product-price">$${item.price.toFixed(2)}</div>
+                </div>
+                <div class="product-vendor"><span class="vendor-badge">${item.vendor}</span></div>
+                <div class="product-actions">
+                    ${bought ? '<button class="btn btn-purchased" disabled>Purchased</button>' : 
+                              `<button class="btn btn-primary" onclick="openPurchase('${item.id}')">Mark as purchased</button>`}
+                </div>
+                <div class="product-link"><button class="btn btn-secondary btn-block" onclick="openLink('${item.id}')">View Item</button></div>
+            </div>
+        </div>`;
+    }).join('');
 
-        // Home title click
-        homeTitle.addEventListener('click', () => {
-            navigateTo('home');
-        });
+    const sort = (list, fn) => list.sort((a, b) => {
+        if (a.purchased && !b.purchased) return 1;
+        if (!a.purchased && b.purchased) return -1;
+        return fn ? fn(a, b) : 0;
+    });
 
-        // Escape key to close nav and modals
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                if (!navOverlay.hasAttribute('hidden')) {
-                    closeNav();
-                } else if (!purchaseModal.hasAttribute('hidden')) {
-                    closePurchaseModal();
-                }
+    const page = (title, sub, list, sortFn) => {
+        const filtered = list.filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()));
+        return `<button class="back-button" onclick="nav('home')">← Back</button>
+            <div class="page-header"><h1 class="page-title">${title}</h1><p class="page-subtitle">${sub}</p></div>
+            <div class="product-grid">${cards(sort(filtered, sortFn))}</div>`;
+    };
+
+    const home = () => {
+        const homeContent = $('home-content');
+        if (homeContent) homeContent.style.display = 'block';
+        
+        const under20 = items.filter(i => i.price <= 20 && !i.purchased).length;
+        const thirty = items.filter(i => i.price > 20 && i.price <= 30 && !i.purchased).length;
+        const ranks = { S: 0, A: 0, B: 0, C: 0 };
+        items.forEach(i => ranks[i.rank] = (ranks[i.rank] || 0) + 1);
+        
+        const under20El = $('under20-count');
+        const thirtyEl = $('thirty-count');
+        const projectEl = $('project-count');
+        const pillsEl = $('priority-pills');
+        
+        if (under20El) under20El.textContent = `${under20} gift ideas`;
+        if (thirtyEl) thirtyEl.textContent = `${thirty} gift ideas`;
+        if (projectEl) projectEl.textContent = `${projects.length} projects`;
+        if (pillsEl) pillsEl.innerHTML = Object.entries(ranks).map(([r, c]) => `<span class="priority-pill">${r}: ${c}</span>`).join('');
+
+        if (!window.homeSet) {
+            $$('.category-card').forEach(c => c.onclick = e => {
+                const r = e.currentTarget.dataset.route;
+                if (r) { sfx('sounds/super_mario_bros_mushroom_sound_effect_58k.mp3'); nav(r); }
+            });
+            
+            const secretHero = $('secret-hero');
+            if (secretHero) {
+                secretHero.onclick = () => {
+                    const now = Date.now();
+                    if (now - lastTap > 2000) taps = 0;
+                    lastTap = now;
+                    if (++taps >= 5) { taps = 0; sfx('sounds/ringtones-zelda-1.mp3'); nav('admin-login'); }
+                };
             }
-        });
-    }
-
-    // Navigation functions
-    function toggleNav() {
-        navOverlay.removeAttribute('hidden');
-    }
-
-    function closeNav() {
-        navOverlay.setAttribute('hidden', '');
-    }
-
-    function navigateTo(route) {
-        console.log(`navigateTo called with route: ${route}, current route: ${currentRoute}`);
-        
-        if (currentRoute === route) {
-            console.log('Same route, skipping navigation');
-            return; // Don't navigate to same route
-        }
-        
-        // Gate admin dashboard
-        if (route === 'admin' && !isAdmin) {
-            currentRoute = 'admin-login';
-        } else {
-            currentRoute = route;
-        }
-        console.log(`Route changed to: ${currentRoute}`);
-        updateActiveNavItem();
-        
-        // Update URL and browser history
-        const url = new URL(window.location);
-        if (route === 'home') {
-            url.searchParams.delete('route');
-                    } else {
-            url.searchParams.set('route', route);
-        }
-        window.history.pushState({ route: route }, '', url.toString());
-        
-        console.log('About to render...');
-        render();
-        console.log('Render complete');
-    }
-
-    function goBack() {
-        // Use browser's back functionality
-        if (window.history.length > 1) {
-            window.history.back();
-                } else {
-            // Fallback to home if no history
-            navigateTo('home');
-        }
-    }
-
-    // Purchase modal functions
-    function openPurchaseModal(itemId) {
-        const item = items.find(i => i.id === itemId);
-        if (item) {
-            itemToPurchase = itemId;
-            document.getElementById('purchase-confirm-text').textContent = 
-                `Are you sure you want to mark "${item.title}" as purchased? This will remove it from your wishlist.`;
-            purchaseModal.removeAttribute('hidden');
-            purchaseModal.setAttribute('aria-hidden', 'false');
-        }
-    }
-
-    function closePurchaseModal() {
-        purchaseModal.setAttribute('hidden', 'true');
-        purchaseModal.setAttribute('aria-hidden', 'true');
-        itemToPurchase = null;
-    }
-
-    async function confirmPurchase() {
-        if (itemToPurchase) {
-            const item = items.find(i => i.id === itemToPurchase);
-            if (item) {
-                // Mark as purchased and save to JSONBin
-                item.purchased = true;
-                try {
-                    await updateJSONBin();
-                    closePurchaseModal();
-                    playSfx('sounds/zelda-chest-opening-and-item-catch.mp3');
-                    render();
-                    toast(`"${item.title}" marked as purchased!`);
-                } catch (error) {
-                    console.error('Failed to update JSONBin:', error);
-                    toast('Failed to update. Please try again.');
-                }
-            }
-        }
-    }
-
-    // Update JSONBin with current data
-    async function updateJSONBin() {
-        try {
-            const headers = {
-                'Content-Type': 'application/json',
-                'X-Access-Key': JSONBIN_KEY
-            };
-            
-            const payload = { items, projects };
-            console.log('Updating JSONBin with payload:', payload);
-            
-            // Use base URL without /latest for updates
-            const updateUrl = JSONBIN_URL.replace('/latest', '');
-            
-            const res = await fetch(updateUrl, {
-                method: 'PUT',
-                headers,
-                body: JSON.stringify(payload)
-            });
-            
-            console.log('Update response status:', res.status, res.statusText);
-            
-            if (!res.ok) {
-                throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-            }
-            
-            await saveData(); // Also update local cache
-            console.log('JSONBin updated successfully');
-        } catch (error) {
-            console.error('Failed to update JSONBin:', error);
-            throw error;
-        }
-    }
-
-    function updateActiveNavItem() {
-        navItems.forEach(item => {
-            const route = item.getAttribute('data-route');
-            item.classList.toggle('is-active', route === currentRoute);
-        });
-    }
-
-    // Update header content for non-home pages
-    function updateHeaderContent() {
-        const headerContent = document.querySelector('.header-content');
-        if (headerContent && currentRoute !== 'home') {
-            headerContent.innerHTML = `
-                <div class="header-brand" onclick="navigateTo('home')" style="cursor: pointer;">
-                    <div class="header-icon">🎁</div>
-                    <div class="header-title">Josh's Wishlist</div>
-                </div>
-                <div class="header-subtitle" onclick="navigateTo('home')" style="cursor: pointer;">A curated collection of birthday wishes organized just for you</div>
-            `;
-        }
-    }
-
-    // Main render function
-    function render() {
-        // Update body class for styling
-        document.body.classList.toggle('home-page', currentRoute === 'home');
-        
-        // Update header content for non-home pages
-        updateHeaderContent();
-        
-        if (currentRoute.startsWith('project-')) {
-            const projectId = currentRoute.replace('project-', '');
-            renderProjectDetail(projectId);
-        } else {
-        switch (currentRoute) {
-            case 'home':
-                renderHome();
-                break;
-            case 'admin-login':
-                renderAdminLogin();
-                break;
-            case 'admin':
-                if (!isAdmin) { renderAdminLogin(); break; }
-                renderAdminDashboard();
-                break;
-            case 'under-20':
-                renderUnder20();
-                break;
-            case '30-items':
-                renderPriceRange(20, 30, '$30 Items', 'Great value gifts that hit the sweet spot');
-                break;
-            case 'by-rank':
-                renderByPriority();
-                break;
-            case 'by-project':
-                renderByProject();
-                break;
-            case 'purchased':
-                renderPurchased();
-                break;
-            default:
-                renderHome();
-                break;
-            }
-        }
-    }
-
-    // Render home screen
-    function renderHome() {
-        const under20Count = items.filter(item => item.price <= 20 && !item.purchased).length;
-        const thirtyItemsCount = items.filter(item => item.price > 20 && item.price <= 30 && !item.purchased).length;
-        const rankCounts = {
-            S: items.filter(item => item.rank === 'S').length,
-            A: items.filter(item => item.rank === 'A').length,
-            B: items.filter(item => item.rank === 'B').length,
-            C: items.filter(item => item.rank === 'C').length
-        };
-        const projectCount = projects.length;
-
-        contentArea.innerHTML = `
-            <div class="home-hero">
-                <div class="hero-icon" id="secret-hero">🎁</div>
-                <h1 class="hero-title">Josh's Wishlist</h1>
-                <p class="hero-subtitle">A curated collection of birthday wishes organized just for you</p>
-            </div>
-
-            <div class="category-grid">
-                <div class="category-card under-20" data-route="under-20">
-                    <div class="category-header">
-                        <div class="category-icon">$</div>
-                        <div class="category-title">Under $20</div>
-                    </div>
-                    <div class="category-description">Perfect stocking stuffers and small gift ideas</div>
-                    <div class="category-count">${under20Count} gift ideas</div>
-                </div>
-
-                <div class="category-card thirty-items" data-route="30-items">
-                    <div class="category-header">
-                        <div class="category-icon">🎯</div>
-                        <div class="category-title">$30 Items</div>
-                    </div>
-                    <div class="category-description">Great value gifts that hit the sweet spot</div>
-                    <div class="category-count">${thirtyItemsCount} gift ideas</div>
-                </div>
-
-                <div class="category-card by-priority" data-route="by-rank">
-                    <div class="category-header">
-                        <div class="category-icon">⭐</div>
-                        <div class="category-title">By Priority</div>
-                        </div>
-                    <div class="category-description">See what I want most (S-tier = dream gifts!)</div>
-                    <div class="category-pills">
-                        <span class="priority-pill">S: ${rankCounts.S}</span>
-                        <span class="priority-pill">A: ${rankCounts.A}</span>
-                        <span class="priority-pill">B: ${rankCounts.B}</span>
-                        <span class="priority-pill">C: ${rankCounts.C}</span>
-                    </div>
-                </div>
-
-                <div class="category-card by-category" data-route="by-project">
-                    <div class="category-header">
-                        <div class="category-icon">🏗️</div>
-                        <div class="category-title">By Project</div>
-                    </div>
-                    <div class="category-description">Browse my wishlist by projects and goals</div>
-                    <div class="category-count">${projectCount} projects</div>
-                            </div>
-                    </div>
-        `;
-
-        // Add click handlers for category cards
-        document.querySelectorAll('.category-card').forEach(card => {
-            card.addEventListener('click', (e) => {
-                const route = e.currentTarget.getAttribute('data-route');
-                if (route) {
-                    playSfx('sounds/super_mario_bros_mushroom_sound_effect_58k.mp3');
-                    navigateTo(route);
-                }
-            });
-        });
-
-        // Secret 5-tap to open admin
-        const secretHero = document.getElementById('secret-hero');
-        if (secretHero) {
-            secretHero.addEventListener('click', () => {
-                const now = Date.now();
-                if (now - lastSecretTapTs > 2000) {
-                    secretTapCount = 0; // reset if more than 2s passed
-                }
-                lastSecretTapTs = now;
-                secretTapCount += 1;
-                if (secretTapCount >= 5) {
-                    secretTapCount = 0;
-                    playSfx('sounds/ringtones-zelda-1.mp3');
-                    navigateTo('admin-login');
-                }
-            });
-        }
-    }
-
-    // Render under $20 items
-    function renderUnder20() {
-        let filteredItems = items.filter(item => 
-            item.price <= 20 && 
-            (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-        
-        // Sort to put purchased items at the bottom
-        filteredItems.sort((a, b) => {
-            if (a.purchased && !b.purchased) return 1;
-            if (!a.purchased && b.purchased) return -1;
-            return 0;
-        });
-
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
-                ← Back
-            </button>
-            <div class="page-header">
-                <h1 class="page-title">Under $20</h1>
-                <p class="page-subtitle">Perfect stocking stuffers and small gift ideas</p>
-            </div>
-            ${renderItemGrid(filteredItems)}
-        `;
-
-        // Add back button event listener
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', goBack);
-        }
-    }
-
-    // Render price range items
-    function renderPriceRange(min, max, title, description) {
-        let filteredItems = items.filter(item => 
-            item.price > min && 
-            item.price <= max && 
-            (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-        
-        // Sort to put purchased items at the bottom
-        filteredItems.sort((a, b) => {
-            if (a.purchased && !b.purchased) return 1;
-            if (!a.purchased && b.purchased) return -1;
-            return 0;
-        });
-
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
-                ← Back
-            </button>
-            <div class="page-header">
-                <h1 class="page-title">${title}</h1>
-                <p class="page-subtitle">${description}</p>
-            </div>
-            ${renderItemGrid(filteredItems)}
-        `;
-
-        // Add back button event listener
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', goBack);
-        }
-    }
-
-    // Render by priority view
-    function renderByPriority() {
-        const rankCounts = {
-            S: items.filter(item => item.rank === 'S').length,
-            A: items.filter(item => item.rank === 'A').length,
-            B: items.filter(item => item.rank === 'B').length,
-            C: items.filter(item => item.rank === 'C').length
-        };
-
-        let filteredItems = items.filter(item => 
-            (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-
-        // Sort by rank priority (S > A > B > C), then put purchased items at bottom
-        const rankOrder = { S: 4, A: 3, B: 2, C: 1 };
-        filteredItems.sort((a, b) => {
-            // First sort by purchased status (purchased items go to bottom)
-            if (a.purchased && !b.purchased) return 1;
-            if (!a.purchased && b.purchased) return -1;
-            // Then sort by rank priority
-            return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
-        });
-
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
-                ← Back
-            </button>
-            <div class="priority-header">
-                <h1 class="priority-title">By Priority</h1>
-                <p class="priority-subtitle">Gift priority ranking</p>
-            </div>
-            
-            <div class="priority-explanation">
-                <p>S = Dream gifts | A = Really want | B = Would love | C = Nice to have</p>
-            </div>
-
-            <div class="tier-counts">
-                <div class="tier-count">
-                    <div class="tier-letter rank-S">S</div>
-                    <div class="tier-number">${rankCounts.S}</div>
-            </div>
-                <div class="tier-count">
-                    <div class="tier-letter rank-A">A</div>
-                    <div class="tier-number">${rankCounts.A}</div>
-                </div>
-                <div class="tier-count">
-                    <div class="tier-letter rank-B">B</div>
-                    <div class="tier-number">${rankCounts.B}</div>
-                </div>
-                <div class="tier-count">
-                    <div class="tier-letter rank-C">C</div>
-                    <div class="tier-number">${rankCounts.C}</div>
-            </div>
-            </div>
-
-            <div class="filter-tabs">
-                <button class="filter-tab active" data-rank="all">All</button>
-                <button class="filter-tab" data-rank="S">S Tier (${rankCounts.S})</button>
-                <button class="filter-tab" data-rank="A">A Tier (${rankCounts.A})</button>
-                <button class="filter-tab" data-rank="B">B Tier (${rankCounts.B})</button>
-                <button class="filter-tab" data-rank="C">C Tier (${rankCounts.C})</button>
-                </div>
-
-            ${renderItemGrid(filteredItems)}
-        `;
-
-        // Add back button event listener
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', goBack);
-        }
-
-        // Add filter tab functionality
-        document.querySelectorAll('.filter-tab').forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                const rank = e.target.getAttribute('data-rank');
-                
-                // Update active tab
-                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
-                e.target.classList.add('active');
-
-                // Filter items
-                let filtered = items.filter(item => 
-                    (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
-                );
-
-                if (rank !== 'all') {
-                    filtered = filtered.filter(item => item.rank === rank);
-                }
-
-                // Sort by rank priority, then put purchased items at bottom
-                filtered.sort((a, b) => {
-                    // First sort by purchased status (purchased items go to bottom)
-                    if (a.purchased && !b.purchased) return 1;
-                    if (!a.purchased && b.purchased) return -1;
-                    // Then sort by rank priority
-                    return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
-                });
-
-                // Update grid
-                const gridContainer = document.querySelector('.product-grid');
-                if (gridContainer) {
-                    gridContainer.innerHTML = renderItemCards(filtered);
-                }
-            });
-        });
-    }
-
-    // Render individual project detail
-    function renderProjectDetail(projectId) {
-        const project = projects.find(p => p.id === projectId);
-        if (!project) {
-            renderHome();
-            return;
-        }
-
-        let projectItems = items.filter(item => item.project === projectId);
-        
-        // Sort to put purchased items at the bottom
-        projectItems.sort((a, b) => {
-            if (a.purchased && !b.purchased) return 1;
-            if (!a.purchased && b.purchased) return -1;
-            return 0;
-        });
-        
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Back to projects" id="back-to-projects">
-                ← Back to Projects
-            </button>
-            <div class="page-header">
-                <h1 class="page-title">${project.name}</h1>
-                <div class="project-description-container">
-                    <p class="page-subtitle">${project.description}</p>
-                    <div class="project-stats">
-                        <div class="stat-item">
-                            <span class="stat-number">${projectItems.length}</span>
-                            <span class="stat-label">Total Items</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${projectItems.filter(item => !item.purchased).length}</span>
-                            <span class="stat-label">Available</span>
-                        </div>
-                        <div class="stat-item">
-                            <span class="stat-number">${projectItems.filter(item => item.purchased).length}</span>
-                            <span class="stat-label">Purchased</span>
-                        </div>
-                    </div>
-                </div>
-                ${project.giftNote ? `
-                    <div class="project-gift-note">
-                        <div class="gift-note-label">Gift Note:</div>
-                        <div class="gift-note-content">${project.giftNote}</div>
-                    </div>
-                ` : ''}
-            </div>
-            ${renderItemGrid(projectItems)}
-        `;
-
-        // Add back to projects event listener
-        const backToProjectsBtn = document.getElementById('back-to-projects');
-        if (backToProjectsBtn) {
-            backToProjectsBtn.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                navigateTo('by-project');
-            });
-        }
-    }
-
-    // Render by project view
-    function renderByProject() {
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
-                ← Back
-            </button>
-            <div class="page-header">
-                <h1 class="page-title">Projects</h1>
-                <p class="page-subtitle">Browse my wishlist by projects and goals</p>
-            </div>
-
-            <div class="category-grid">
-                ${projects
-                    .map(project => {
-                    // Calculate actual item count for this project
-                    const actualItemCount = items.filter(item => item.project === project.id && !item.purchased).length;
-                        return { project, actualItemCount };
-                    })
-                    .sort((a, b) => b.actualItemCount - a.actualItemCount) // Sort by item count descending
-                    .map(({ project, actualItemCount }) => {
-                        // Check if project has an icon image
-                    if (project['project-icon-image']) {
-                        return `
-                        <div class="category-card project-icon-card" data-project="${project.id}">
-                            <div class="project-icon-image-container">
-                                <div class="project-icon-bg" style="background-image: url('${project['project-icon-image']}');"></div>
-                            </div>
-                            <div class="project-name">${project.name}</div>
-                        </div>
-                        `;
-                    } else {
-                    return `
-                    <div class="category-card" style="background: linear-gradient(135deg, ${project.color}22, ${project.color}44), url('${project.coverImage || ''}') center/cover no-repeat;" data-project="${project.id}">
-                        <div class="category-header">
-                            <div class="category-icon">${project.icon}</div>
-                            <div class="category-title">${project.name}</div>
-                        </div>
-                        <div class="category-description">${project.description}</div>
-                        <div style="margin-top: 12px;">
-                            <div style="color: rgba(255,255,255,0.8); font-size: 14px; margin-bottom: 4px;">Gift Note:</div>
-                            <div style="color: rgba(255,255,255,0.9); font-weight: 600;">${project.giftNote || 'No gift note available'}</div>
-                        </div>
-                        <div class="category-count" style="margin-top: 16px;">${actualItemCount} items</div>
-                    </div>
-                    `;
-                    }
-                }).join('')}
-            </div>
-        `;
-
-        // Add back button event listener
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', goBack);
-        }
-
-        // Add click handlers
-        document.querySelectorAll('.category-card[data-project]').forEach(card => {
-            card.addEventListener('click', (e) => {
-                const projectId = e.currentTarget.getAttribute('data-project');
-                const project = projects.find(p => p.id === projectId);
-                if (project) {
-                    // Navigate to project-specific route
-                    navigateTo(`project-${projectId}`);
-                }
-            });
-        });
-    }
-
-    // Render purchased items
-    function renderPurchased() {
-        let purchasedItems = items.filter(item => 
-            item.purchased &&
-            (searchQuery === '' || item.title.toLowerCase().includes(searchQuery.toLowerCase()))
-        );
-        
-        // Sort by date purchased (most recent first) or by rank if no date
-        const rankOrder = { S: 4, A: 3, B: 2, C: 1 };
-        purchasedItems.sort((a, b) => {
-            // If we had purchase dates, we could sort by those
-            // For now, sort by rank priority
-            return (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0);
-        });
-
-        contentArea.innerHTML = `
-            <button class="back-button tooltip" data-tooltip="Go back" id="back-btn">
-                ← Back
-            </button>
-            <div class="page-header">
-                <h1 class="page-title">Purchased Items</h1>
-                <p class="page-subtitle">Items that have been bought</p>
-                </div>
-            ${renderItemGrid(purchasedItems)}
-        `;
-
-        // Add back button event listener
-        const backBtn = document.getElementById('back-btn');
-        if (backBtn) {
-            backBtn.addEventListener('click', goBack);
-        }
-    }
-
-    // Render item grid
-    function renderItemGrid(itemList) {
-        if (itemList.length === 0) {
-            return `
-                <div class="text-center" style="padding: 40px 0; color: var(--text-secondary);">
-                    <div style="font-size: 48px; margin-bottom: 16px;">📦</div>
-                    <h3>No items found</h3>
-                    <p>Try adjusting your search or filters</p>
-                </div>
-            `;
-        }
-
-        return `
-            <div class="product-grid">
-                ${renderItemCards(itemList)}
-            </div>
-        `;
-    }
-
-    // Helper function to get domain from URL
-    function getDomainFromUrl(url) {
-        try {
-            const urlObj = new URL(url);
-            return urlObj.hostname;
-        } catch (e) {
-            return 'amazon.com'; // fallback
-        }
-    }
-
-    // Helper function to get the primary URL for an item
-    function getItemUrl(item) {
-        // First try direct url field
-        if (item.url) {
-            return item.url;
-        }
-        
-        // Then try links array (get primary link)
-        if (item.links && item.links.length > 0) {
-            const primaryLink = item.links.find(link => link.type === 'primary') || item.links[0];
-            return primaryLink.url;
-        }
-        
-        // Fallback to Amazon
-        return 'https://amazon.com';
-    }
-
-    // Render individual item cards
-    function renderItemCards(itemList) {
-        return itemList.map(item => {
-            const project = projects.find(p => p.id === item.project);
-            const isPurchased = item.purchased;
-            const itemUrl = getItemUrl(item);
-            const domain = getDomainFromUrl(itemUrl);
-            
-            return `
-                <div class="product-card${isPurchased ? ' purchased' : ''}">
-                    <div class="product-image">
-                        ${item.image ? 
-                            `<img src="${item.image}" alt="${item.title}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';">
-                             <div class="placeholder" style="display: none;">📦</div>` :
-                            `<div class="placeholder">📦</div>`
-                        }
-                        <div class="rank-badge rank-${item.rank} tooltip" data-tooltip="Priority: ${item.rank === 'S' ? 'Dream gift!' : item.rank === 'A' ? 'Really want' : item.rank === 'B' ? 'Would love' : 'Nice to have'}">${item.rank}</div>
-                    </div>
-                    <div class="product-info">
-                        <div class="product-header">
-                            <h3 class="product-title">${item.title}</h3>
-                            <div class="product-price">$${item.price.toFixed(2)}</div>
-                        </div>
-                        <div class="product-vendor">
-                            <span class="vendor-badge">${item.vendor}</span>
-                        </div>
-                        <div class="product-actions">
-                            ${isPurchased ? 
-                                `<button class="btn btn-purchased tooltip" data-tooltip="Already purchased" disabled>Purchased</button>` :
-                                `<button class="btn btn-primary tooltip" data-tooltip="Mark as purchased" onclick="openPurchaseModal('${item.id}')">Mark as purchased</button>`
-                            }
-                        </div>
-                        <div class="product-link">
-                            <button class="btn btn-secondary btn-block" onclick="openLink('${item.id}')">View Item</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
-
-    // Item interaction functions
-    window.openLink = (itemId) => {
-        const item = items.find(i => i.id === itemId);
-        if (item) {
-            const itemUrl = getItemUrl(item);
-            window.open(itemUrl, '_blank');
-        } else {
-            // Fallback to Amazon
-            window.open('https://amazon.com', '_blank');
+            window.homeSet = true;
         }
     };
 
-    // Removed tracked feature
+    const render = () => {
+        // Keep home-page class set initially for static landing; remove only when leaving home
+        if (route === 'home') {
+            document.body.classList.add('home-page');
+        } else {
+            document.body.classList.remove('home-page');
+        }
+        
+        const hc = document.querySelector('.header-content');
+        if (hc && route !== 'home') {
+            hc.innerHTML = `<div class="header-brand" onclick="nav('home')" style="cursor:pointer">
+                <div class="header-icon">🎁</div><div class="header-title">Josh's Wishlist</div></div>
+                <div class="header-subtitle" onclick="nav('home')" style="cursor:pointer">A curated collection of birthday wishes organized just for you</div>`;
+        }
+        
+        const homeEl = $('home-content');
+        const contentArea = $('content-area');
+        let viewEl = $('route-view');
+        
+        if (route === 'home') {
+            if (homeEl) homeEl.style.display = 'block';
+            if (viewEl) { viewEl.innerHTML = ''; viewEl.style.display = 'none'; }
+        } else {
+            if (homeEl) homeEl.style.display = 'none';
+            if (!contentArea) return;
+            if (viewEl) viewEl.style.display = 'block';
+        }
+        if (route.startsWith('project-')) {
+            const projId = route.replace('project-', '');
+            const proj = projects.find(p => p.id === projId);
+            if (!proj) return nav('home');
+            const projItems = sort(items.filter(i => i.project === projId));
+            const avail = projItems.filter(i => !i.purchased).length;
+            const bought = projItems.filter(i => i.purchased).length;
+            if (!viewEl) return;
+            viewEl.innerHTML = `<button class="back-button" onclick="nav('by-project')">← Back to Projects</button>
+                <div class="page-header"><h1 class="page-title">${proj.name}</h1>
+                <div class="project-description-container"><p class="page-subtitle">${proj.description}</p>
+                <div class="project-stats">
+                    <div class="stat-item"><span class="stat-number">${projItems.length}</span><span class="stat-label">Total</span></div>
+                    <div class="stat-item"><span class="stat-number">${avail}</span><span class="stat-label">Available</span></div>
+                    <div class="stat-item"><span class="stat-number">${bought}</span><span class="stat-label">Purchased</span></div>
+                </div></div></div><div class="product-grid">${cards(projItems)}</div>`;
+        } else {
+            switch (route) {
+                case 'home': home(); break;
+                case 'admin-login': 
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<div class="admin-login-card"><div class="admin-login-icon">🔒</div><h2 class="admin-login-title">Admin Access</h2>
+                        <div class="form-group"><label>Password</label><input id="admin-pass" type="password" class="form-input" />
+                        <div id="admin-error" class="admin-error hidden">Invalid password</div></div>
+                        <button onclick="login()" class="btn btn-primary btn-block">Login</button></div>`;
+                    break;
+                case 'admin': 
+                    if (!admin) return nav('admin-login');
+                    const projOpts = projects.map(p => `<option value="${p.id}">${p.name}</option>`).join('');
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<div class="admin-header"><h1>Admin Dashboard</h1>
+                        <button onclick="logoutAdmin()" class="btn btn-secondary">Logout</button></div>
+                        <div class="admin-tabs">
+                        <button class="admin-tab ${adminTab==='items'?'active':''}" onclick="setAdminTab('items')">Items</button>
+                        <button class="admin-tab ${adminTab==='projects'?'active':''}" onclick="setAdminTab('projects')">Projects</button></div>
+                        <div class="admin-section">${adminTab === 'items' ? 
+                        `<div class="admin-card"><h2>Add Item</h2>
+                        <div class="form-group"><label>Name</label><input id="n-name" class="form-input" placeholder="Name" /></div>
+                        <div class="form-group"><label>Price</label><input id="n-price" type="number" class="form-input" value="0" /></div>
+                        <div class="form-group"><label>Vendor</label><input id="n-vendor" class="form-input" placeholder="Vendor (e.g., Amazon)" /></div>
+                        <div class="form-group"><label>Project</label><select id="n-proj" class="form-input"><option value="">None</option>${projOpts}</select></div>
+                        <div class="form-group"><label>Rank</label><select id="n-rank" class="form-input"><option value="S">S</option><option value="A" selected>A</option><option value="B">B</option><option value="C">C</option></select></div>
+                        <div class="form-group"><label>Image URL</label><input id="n-image" class="form-input" placeholder="https://..." /></div>
+                        <div class="form-group"><label>Item URL</label><input id="n-url" class="form-input" placeholder="https://..." /></div>
+                        <div class="form-group"><label><input id="n-purchased" type="checkbox" /> Purchased</label></div>
+                        <button onclick="addItem()" class="btn btn-primary">Add Item</button></div>
+                        <div class="admin-card"><h2>Items</h2><div class="admin-list">
+                        ${items.map((it, i) => `<div class="admin-list-row"><div class="admin-list-main">
+                        <div class="admin-list-title">${it.title}</div></div>
+                        <button onclick="delItem(${i})" class="btn btn-secondary">Delete</button></div>`).join('')}</div></div>` :
+                        `<div class="admin-card"><h2>Add Project</h2>
+                        <div class="form-group"><label>Name</label><input id="p-name" class="form-input" placeholder="Name" /></div>
+                        <div class="form-group"><label>Description</label><textarea id="p-desc" class="form-input" placeholder="Description"></textarea></div>
+                        <div class="form-group"><label>Icon</label><input id="p-icon" class="form-input" value="📦" /></div>
+                        <div class="form-group"><label>Color</label><input id="p-color" class="form-input" value="#f97316" /></div>
+                        <div class="form-group"><label>Project Icon Image URL</label><input id="p-pimg" class="form-input" placeholder="https://..." /></div>
+                        <button onclick="addProj()" class="btn btn-primary">Add Project</button></div>
+                        <div class="admin-card"><h2>Projects</h2><div class="admin-list">
+                        ${projects.map((p, i) => `<div class="admin-list-row"><div class="admin-list-main">
+                        <div class="admin-list-title">${p.name}</div></div>
+                        <button onclick="delProj(${i})" class="btn btn-secondary">Delete</button></div>`).join('')}</div></div>`}</div>`;
+                break;
+            case 'under-20':
+                    const under20Items = items.filter(i => i.price <= 20 && (!query || i.title.toLowerCase().includes(query.toLowerCase())));
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<button class="back-button" onclick="nav('home')">← Back</button>
+                        <div class="page-header"><h1 class="page-title">Under $20</h1><p class="page-subtitle">Small gifts</p></div>
+                        <div class="product-grid">${cards(sort(under20Items))}</div>`;
+                break;
+            case '30-items':
+                    const thirtyItems = items.filter(i => i.price > 20 && i.price <= 30 && (!query || i.title.toLowerCase().includes(query.toLowerCase())));
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<button class="back-button" onclick="nav('home')">← Back</button>
+                        <div class="page-header"><h1 class="page-title">$30 Items</h1><p class="page-subtitle">Great value</p></div>
+                        <div class="product-grid">${cards(sort(thirtyItems))}</div>`;
+                break;
+            case 'by-rank':
+                    const ranks = { S: 4, A: 3, B: 2, C: 1 };
+                    const filtered = items.filter(i => !query || i.title.toLowerCase().includes(query.toLowerCase()));
+                    const sorted = sort(filtered, (a, b) => (ranks[b.rank] || 0) - (ranks[a.rank] || 0));
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<button class="back-button" onclick="nav('home')">← Back</button>
+                        <div class="priority-header"><h1>By Priority</h1></div>
+                        <div class="product-grid">${cards(sorted)}</div>`;
+                break;
+            case 'by-project':
+                    const sorted2 = projects.map(p => ({ p, count: items.filter(i => i.project === p.id && !i.purchased).length }))
+                        .sort((a, b) => b.count - a.count);
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<button class="back-button" onclick="nav('home')">← Back</button>
+                        <div class="page-header"><h1>Projects</h1></div><div class="category-grid">
+                        ${sorted2.map(({ p, count }) => p['project-icon-image'] ? 
+                            `<div class="category-card project-icon-card" onclick="nav('project-${p.id}')">
+                                <div class="project-icon-image-container">
+                                    <div class="project-icon-bg" style="background-image:url('${p['project-icon-image']}')"></div>
+                                </div><div class="project-name">${p.name}</div></div>` :
+                            `<div class="category-card" onclick="nav('project-${p.id}')" style="background:linear-gradient(135deg,${p.color}22,${p.color}44)">
+                                <div class="category-header"><div class="category-icon">${p.icon}</div><div class="category-title">${p.name}</div></div>
+                                <div class="category-description">${p.description}</div><div class="category-count">${count} items</div></div>`
+                        ).join('')}</div>`;
+                break;
+            case 'purchased':
+                    const purchasedItems = items.filter(i => i.purchased && (!query || i.title.toLowerCase().includes(query.toLowerCase())));
+                    if (!viewEl) return;
+                    viewEl.innerHTML = `<button class="back-button" onclick="nav('home')">← Back</button>
+                        <div class="page-header"><h1 class="page-title">Purchased Items</h1><p class="page-subtitle">Bought items</p></div>
+                        <div class="product-grid">${cards(sort(purchasedItems))}</div>`;
+                break;
+                default: home(); break;
+            }
+        }
+    };
 
-    // Add toast function
-    function toast(message) {
-        const toastStack = document.getElementById('toast-stack');
-        const toast = document.createElement('div');
-        toast.className = 'toast';
-        toast.textContent = message;
-        toastStack.appendChild(toast);
-        setTimeout(() => toast.remove(), 3000);
-    }
+    // Global functions
+    window.nav = nav;
+    window.login = () => {
+        const passEl = $('admin-pass');
+        const errEl = $('admin-error');
+        const entered = (passEl ? passEl.value.trim() : '').toString();
+        if (entered && entered === adminSecret) {
+            sfx('sounds/ringtones-zelda-1.mp3');
+            admin = true;
+            localStorage.setItem('wishlist-admin', 'true');
+            nav('admin');
+        } else if (errEl) {
+            errEl.classList.remove('hidden');
+        }
+    };
+    window.addItem = async () => {
+        const name = $('n-name').value.trim();
+        if (!name) return toast('Name required');
+        const price = +$('n-price').value || 0;
+        const vendor = $('n-vendor').value.trim();
+        const project = $('n-proj').value;
+        const rank = $('n-rank').value || 'A';
+        const image = $('n-image').value.trim();
+        const url = $('n-url').value.trim();
+        const purchased = $('n-purchased').checked;
+        items.push({ id: name.toLowerCase().replace(/\s+/g, '-'), title: name, price, project, rank, vendor, image, url, purchased });
+        try { await save(); toast('Item added'); render(); } catch { toast('Save failed'); }
+    };
+    window.setAdminTab = tab => { adminTab = tab; render(); };
+    window.logoutAdmin = () => { admin = false; localStorage.removeItem('wishlist-admin'); nav('home'); };
+    window.delItem = async i => {
+        if (!confirm(`Delete "${items[i].title}"?`)) return;
+        items.splice(i, 1);
+        try { await save(); toast('Deleted'); render(); } catch { toast('Failed'); }
+    };
+    window.addProj = async () => {
+        const name = $('p-name').value.trim();
+        if (!name) return toast('Name required');
+        const description = $('p-desc').value.trim();
+        const icon = $('p-icon').value || '📦';
+        const color = $('p-color').value;
+        const pimg = $('p-pimg').value.trim();
+        const id = name.toLowerCase().replace(/\s+/g, '-');
+        projects.push({ id, name, description, icon, color, ...(pimg ? { 'project-icon-image': pimg } : {}) });
+        try { await save(); toast('Project added'); render(); } catch { toast('Save failed'); }
+    };
+    window.delProj = async i => {
+        if (!confirm(`Delete "${projects[i].name}"?`)) return;
+        items.forEach(it => { if (it.project === projects[i].id) it.project = ''; });
+        projects.splice(i, 1);
+        try { await save(); toast('Deleted'); render(); } catch { toast('Failed'); }
+    };
+    window.openPurchase = id => {
+        const item = items.find(i => i.id === id);
+        if (!item) return;
+        purchaseId = id;
+        $('purchase-confirm-text').textContent = `Mark "${item.title}" as purchased?`;
+        $('purchase-modal').removeAttribute('hidden');
+    };
+    window.confirmPurchase = async () => {
+        const item = items.find(i => i.id === purchaseId);
+        if (!item) return;
+        item.purchased = true;
+        try {
+            await save();
+            $('purchase-modal').setAttribute('hidden', 'true');
+            sfx('sounds/zelda-chest-opening-and-item-catch.mp3');
+            render();
+            toast('Purchased!');
+        } catch { toast('Failed'); }
+        purchaseId = null;
+    };
+    window.openLink = id => {
+        const item = items.find(i => i.id === id);
+        if (item) {
+            const url = item.url || (item.links?.length ? item.links[0].url : 'https://amazon.com');
+            window.open(url, '_blank');
+        }
+    };
 
-    // Make functions globally available
-    window.navigateTo = navigateTo;
-    window.goBack = goBack;
-    window.openPurchaseModal = openPurchaseModal;
-
-    // Initialize app when DOM is loaded
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
+    // Events
+    const bind = () => {
+        const menuBtn = $('menu-btn');
+        const closeNav = document.querySelector('.close-nav');
+        const navOverlay = $('nav-overlay');
+        const globalSearch = $('global-search');
+        const homeTitle = $('home-title');
+        const purchaseClose = $('purchase-modal-close');
+        const purchaseCancel = $('purchase-cancel');
+        const purchaseConfirm = $('purchase-confirm');
+        const purchaseModal = $('purchase-modal');
+        
+        if (menuBtn) menuBtn.onclick = () => navOverlay && navOverlay.removeAttribute('hidden');
+        if (closeNav) closeNav.onclick = () => navOverlay && navOverlay.setAttribute('hidden', '');
+        if (navOverlay) navOverlay.onclick = e => e.target === navOverlay && navOverlay.setAttribute('hidden', '');
+        if (homeTitle) homeTitle.onclick = () => nav('home');
+        
+        $$('.nav-item').forEach(i => i.onclick = () => { 
+            nav(i.dataset.route); 
+            navOverlay && navOverlay.setAttribute('hidden', ''); 
+        });
+        
+        if (globalSearch) globalSearch.oninput = e => { query = e.target.value.trim(); render(); };
+        if (purchaseClose) purchaseClose.onclick = () => purchaseModal && purchaseModal.setAttribute('hidden', 'true');
+        if (purchaseCancel) purchaseCancel.onclick = () => purchaseModal && purchaseModal.setAttribute('hidden', 'true');
+        if (purchaseConfirm) purchaseConfirm.onclick = window.confirmPurchase;
+        
+        window.onpopstate = e => {
+            if (e.state && e.state.route) {
+                route = e.state.route;
     } else {
-        init();
-    }
+                const r = new URLSearchParams(location.search).get('route') || 'home';
+                route = r;
+            }
+            if (navOverlay) navOverlay.setAttribute('hidden', '');
+            render();
+        };
+    };
 
+    // Init
+    const init = async () => {
+        await load();
+        bind();
+        const r = new URLSearchParams(location.search).get('route');
+        if (r) route = r;
+        admin = localStorage.getItem('wishlist-admin') === 'true';
+        render();
+    };
+
+    // Start
+    document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
 })();

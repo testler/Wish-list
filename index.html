@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="style.css">
     <meta name="color-scheme" content="dark">
 </head>
-<body>
+<body class="home-page">
     <!-- Mobile Navigation Overlay -->
     <div id="nav-overlay" class="nav-overlay" hidden>
         <div class="nav-sidebar">
@@ -70,7 +70,56 @@
         <!-- Main Content -->
         <main id="main-content" class="main-content">
             <div id="content-area" class="content-area">
-                <!-- Content will be dynamically rendered here -->
+                <!-- Home page pre-rendered to prevent loading flash -->
+                <div id="home-content">
+                    <div class="home-hero">
+                        <div class="hero-icon" id="secret-hero">🎁</div>
+                        <h1 class="hero-title">Josh's Wishlist</h1>
+                        <p class="hero-subtitle">A curated collection of birthday wishes organized just for you</p>
+                    </div>
+
+                    <div class="category-grid">
+                        <div class="category-card under-20" data-route="under-20">
+                            <div class="category-header">
+                                <div class="category-icon">$</div>
+                                <div class="category-title">Under $20</div>
+                            </div>
+                            <div class="category-description">Perfect stocking stuffers and small gift ideas</div>
+                            <div class="category-count" id="under20-count">Loading...</div>
+                        </div>
+
+                        <div class="category-card thirty-items" data-route="30-items">
+                            <div class="category-header">
+                                <div class="category-icon">🎯</div>
+                                <div class="category-title">$30 Items</div>
+                            </div>
+                            <div class="category-description">Great value gifts that hit the sweet spot</div>
+                            <div class="category-count" id="thirty-count">Loading...</div>
+                        </div>
+
+                        <div class="category-card by-priority" data-route="by-rank">
+                            <div class="category-header">
+                                <div class="category-icon">⭐</div>
+                                <div class="category-title">By Priority</div>
+                            </div>
+                            <div class="category-description">See what I want most (S-tier = dream gifts!)</div>
+                            <div class="category-pills" id="priority-pills">
+                                <span class="priority-pill">Loading...</span>
+                            </div>
+                        </div>
+
+                        <div class="category-card by-category" data-route="by-project">
+                            <div class="category-header">
+                                <div class="category-icon">🏗️</div>
+                                <div class="category-title">By Project</div>
+                            </div>
+                            <div class="category-description">Browse my wishlist by projects and goals</div>
+                            <div class="category-count" id="project-count">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+                <!-- Placeholder for routed views (kept hidden on home) -->
+                <div id="route-view" style="display:none"></div>
             </div>
         </main>
     </div>
