@@ -11,31 +11,14 @@
     let secretTapCount = 0;
     let lastSecretTapTs = 0;
 
-    // Sound effects
-    const SFX = {
-        // Click on any category card (Mario mushroom)
-        click: new Audio('sounds/super_mario_bros_mushroom_sound_effect_58k.mp3'),
-        // Secret area unlock / admin login (Zelda secret ringtone)
-        secret: new Audio('sounds/ringtones-zelda-1.mp3'),
-        // Confirm purchase (Zelda chest)
-        chest: new Audio('sounds/zelda-chest-opening-and-item-catch.mp3')
-    };
-    const MASTER_SFX_VOLUME = 0.1; // 50%
-    Object.values(SFX).forEach(a => {
+    // Sound effects - simple approach
+    function playSfx(soundFile) {
         try {
-            a.preload = 'auto';
-            a.volume = MASTER_SFX_VOLUME;
-        } catch {}
-    });
-
-    function playSfx(key) {
-        const a = SFX[key];
-        if (!a) return;
-        try {
-            a.currentTime = 0;
-            a.play();
+            const audio = new Audio(soundFile);
+            audio.volume = 0.01;
+            audio.play().catch(() => {}); // ignore autoplay failures
         } catch (e) {
-            console.warn('SFX play failed', key, e);
+            console.warn('SFX play failed', e);
         }
     }
 
@@ -629,7 +612,7 @@
                 try {
                     await updateJSONBin();
                     closePurchaseModal();
-                    playSfx('chest');
+                    playSfx('sounds/zelda-chest-opening-and-item-catch.mp3');
                     render();
                     toast(`"${item.title}" marked as purchased!`);
                 } catch (error) {
@@ -808,7 +791,7 @@
             card.addEventListener('click', (e) => {
                 const route = e.currentTarget.getAttribute('data-route');
                 if (route) {
-                    playSfx('click');
+                    playSfx('sounds/super_mario_bros_mushroom_sound_effect_58k.mp3');
                     navigateTo(route);
                 }
             });
@@ -826,7 +809,7 @@
                 secretTapCount += 1;
                 if (secretTapCount >= 5) {
                     secretTapCount = 0;
-                    playSfx('secret');
+                    playSfx('sounds/ringtones-zelda-1.mp3');
                     navigateTo('admin-login');
                 }
             });
@@ -1057,22 +1040,14 @@
         `;
 
         // Add back to projects event listener
-        setTimeout(() => {
-            const backToProjectsBtn = document.getElementById('back-to-projects');
-            if (backToProjectsBtn) {
-                // Remove any existing listeners first
-                backToProjectsBtn.replaceWith(backToProjectsBtn.cloneNode(true));
-                const newBtn = document.getElementById('back-to-projects');
-                newBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    console.log('Back to projects clicked - rendering project list');
-                    navigateTo('by-project');
-                });
-            } else {
-                console.error('Back to projects button not found');
-            }
-        }, 0);
+        const backToProjectsBtn = document.getElementById('back-to-projects');
+        if (backToProjectsBtn) {
+            backToProjectsBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                navigateTo('by-project');
+            });
+        }
     }
 
     // Render by project view
