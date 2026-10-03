@@ -1,266 +1,131 @@
-## Josh's Wishlist
+# Josh's Wishlist
 
-An elegant, single‑page wishlist built with vanilla HTML/CSS/JS. It’s fast, mobile‑first, and delightful to use. Projects group ideas, items can be marked purchased, and a “secret” admin area lets you manage everything with instant persistence.
+A fast, dependency-free wishlist web app. Friends and family can browse gift ideas by price, priority, or project, and mark an item as purchased so nobody buys the same gift twice.
 
-### Table of Contents
-- Quick Start
-- Features
-- Data Model
-- Routing and Navigation
-- Admin Area (Secret)
-- Development Guide
-- Troubleshooting
-- Roadmap
-- License
-
-## Quick Start
-1) Clone or download this repo.
-2) Open `index.html` directly in your browser.
-   - On Windows you can double‑click the file or run:
-```bash
-start index.html
-```
-3) You’re done. No build step, no tooling required.
-
-Optional: Use a lightweight static server for better history/navigation support.
-```bash
-npx serve .
-```
+**Live site:** https://testler.github.io/Wish-list/
 
 ## Features
-- Purchased item UX
-  - Purchased items are visually muted, moved to the bottom, and show a red “Purchased” button.
-- Views and sorting
-  - Under $20, $30 Items, By Priority (S/A/B/C), By Project, Purchased.
-  - Projects are sorted by available item count.
-- Project detail pages
-  - Clean header with name, description, and stats (Total / Available / Purchased).
-- Dynamic favicon/vendor handling
-  - Item links and vendor badges are consistent and robust.
-- Mobile‑first, responsive UI
-  - 2‑column project layout on small screens, fluid grids elsewhere.
-- Fast client‑side router
-  - Hash‑free navigation using `history.pushState`, with full Back/Forward support.
-- Secret admin area
-  - 5 taps on the gift hero icon → password `secret` → add/update/delete items and projects.
-- Persistence
-  - Primary: JSONBin (cloud) via REST; Fallback: `localStorage` (offline‑safe).
-- Sound effects (tasteful, low volume)
-  - Category tap: Mario; Admin enter: Zelda secret; Purchase confirm: Zelda chest.
-- Static landing page
-  - The landing markup is pre‑rendered; JavaScript only updates dynamic counts/pills, so there’s no post‑load layout shift.
 
-## Data Model
-Items and projects live in JSON. The app reads/writes to JSONBin and mirrors data to `localStorage`.
+- **Browse several ways:** under $20, $20–30, by priority tier (S / A / B / C), or by project (Garden, 3D Printing, Home Improvement, …).
+- **Search** across every item from any page.
+- **Purchase tracking that handles more than one shopper.** Purchased items are greyed out and moved to the bottom. If two people go for the same gift, the second one is told it's already taken, so nobody's purchase is silently lost.
+- **Admin dashboard** behind a hidden gesture and password: add or delete items and projects, and change the password.
+- **Offline fallback:** if the data service can't be reached, the last copy the browser saw is shown, read-only.
+- **Mobile first:** a hamburger menu on phones, responsive grids on tablet and desktop, and cards you can open with the keyboard.
+- **Small extras:** retro sound effects on navigation, admin unlock, and purchase.
 
-### Item
-```json
-{
-  "id": "FLIR-ONE-Gen-3",
-  "title": "FLIR ONE Gen 3 - Thermal Imaging Camera for iOS Smartphones",
-  "price": 204,
-  "project": "home-improvement",
-  "rank": "S",
-  "vendor": "Amazon",
-  "image": "https://m.media-amazon.com/images/I/71ggGSZaK+L._AC_SL1500_.jpg",
-  "url": "https://www.amazon.com/dp/B0DPXX7P5M/...",
-  "purchased": false
-}
+## Tech stack
+
+| Layer | Choice |
+|---|---|
+| UI | Vanilla HTML, CSS, JavaScript (ES2020+), with no framework and no build step |
+| Data | [JSONBin.io](https://jsonbin.io), a hosted JSON document used as a small database |
+| Hosting | GitHub Pages, deployed by GitHub Actions on every push to `main` |
+
+## Architecture
+
+The whole app is one static page (`index.html`) plus one script (`app.js`), split into a few layers:
+
+```
+JSONBin (one JSON document)
+   │  GET /latest           PUT
+   ▼                         ▲
+normalize()  ──►  state  ──► mutate(fn): re-fetch → apply fn → normalize → write
+   │                │
+   │                ▼
+   │            render() ──► view functions (template strings, every value escaped)
+   ▼                ▲
+localStorage     one delegated click / submit / keydown listener (data-action="…")
+(offline copy)
 ```
 
-### Project
-```json
-{
-  "id": "home-improvement",
-  "name": "Home Improvement",
-  "description": "House upgrades, tools, and lighting that push back the entropy gremlins.",
-  "icon": "🛠️",
-  "color": "#EAB308",
-  "project-icon-image": "https://...optional-large-image.png"
-}
-```
+### Design decisions
 
-## Routing and Navigation
-- Routes are stored in `?route=...` and managed with `history.pushState`.
-- Core API
-  - `nav(route)` → navigates and renders
-  - `render()` → re‑renders current route
-- Containers
-  - `#home-content` is static HTML for the landing page.
-  - `#route-view` is where routed pages render. It remains hidden while on `home`.
+- **Read-modify-write on every save.** Visitors can keep a tab open for days, so writing the tab's in-memory copy would undo everything changed since it loaded. Instead, `mutate()` fetches the latest document, applies one small change to it, and writes the result back. Writes are queued so a double click can't race itself.
+- **Self-healing data.** The JSON is sometimes edited by hand, so everything passes through `normalize()`: unsafe or duplicate IDs are turned into clean slugs, prices like `"$24.99"` become numbers, unknown ranks fall back to a default, and items that point at a missing project get a placeholder project. The repaired data is saved on the next write.
+- **Safe rendering.** Views are template strings, and every value from the data store goes through `esc()` before it reaches the DOM. Links and images must use `http(s)` URLs, so a `javascript:` URL in the data can't run. Inline `onclick` handlers are replaced by `data-action` attributes and one event listener.
+- **Hashed admin password.** The password is stored as a salted PBKDF2-SHA-256 hash (Web Crypto API), never as plain text.
+- **No build step.** The site is three files and a sounds folder, so it can be opened, read, and deployed as-is.
 
-## Admin Area (Secret)
-- Access: tap the hero gift icon 5 times → enter password `secret`.
-- Tabs: Items | Projects.
-  - Items: add with fields Name, Price, Vendor, Project, Rank (S/A/B/C), Image URL, Item URL, Purchased.
-  - Projects: add with fields Name, Description, Icon, Color, Project Icon Image URL.
-- Persistence
-  - Saves to JSONBin (PUT) and mirrors to `localStorage`.
-  - If JSONBin is unreachable, changes still persist locally until connectivity returns.
+### Known trade-offs
 
-Security note: This is a static SPA; the JSONBin key is client‑side by design. For sensitive use, proxy requests through a tiny backend.
+The JSONBin access key ships to the browser, which is unavoidable for a purely static site. A determined visitor could use it to edit the data directly. For a personal gift list that risk is acceptable, and JSONBin keeps version history for recovery. The upgrade path is a small serverless proxy (for example, a Cloudflare Worker) that holds the key and accepts only narrow operations like "mark item X purchased".
 
-## Development Guide
-- Stack: plain HTML/CSS/JS, no framework.
-- Entry points
-  - `index.html` → static layout and pre‑rendered home
-  - `app.js` → state, router, rendering, admin, sounds
-- Key functions
-  - `load()` → fetches JSONBin, heals missing projects, persists to localStorage
-  - `save()` → writes to JSONBin and localStorage
-  - `nav(to)` / `render()` → routing and view rendering
-  - `home()` → updates dynamic counts and attaches home interactions
-- Sounds
-  - Implemented with `new Audio(file)`. Default volume is set low for comfort.
+## Data model
 
-### Local Editing Flow
-1) Open `index.html` in your browser.
-2) Make changes to `app.js` or styles as needed.
-3) Refresh to see results. No build step required.
-
-## Troubleshooting
-- Landing page flashes or shifts after load
-  - Ensure `<body class="home-page">` and that `#route-view` exists right after `#home-content` in `index.html`.
-- Back button doesn’t navigate
-  - Verify the browser allows history updates on `file://` URLs. Using a static server (`npx serve .`) provides the best experience.
-- Images show broken icons
-  - Broken image URLs are gracefully swapped for a placeholder. Verify the remote URL or add a local image.
-- JSONBin write fails
-  - The app falls back to localStorage. Check network and JSONBin key/URL in `app.js` (`API_URL`, `KEY`).
-
-## Roadmap
-- Edit existing items/projects via inline modals
-- Import/export data as a downloadable JSON file
-- Optional authentication for admin
-- Accessibility polish and keyboard shortcuts
-
-## License
-MIT © 2025
-
-# Josh's Wishlist App
-
-A modern, responsive wishlist application built with vanilla HTML, CSS, and JavaScript. Features a clean dark theme with green accents, JSONBin.io integration for data persistence, and full CRUD functionality for wishlist items.
-
-## 🎯 Features
-
-- **Clean, Modern UI**: Dark green and steel gray theme with glowing accents
-- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile devices
-- **Real-time Data**: Integrates with JSONBin.io for persistent data storage
-- **Multiple Item Types**: Support for both fixed-price items and crowdfunded contributions
-- **Smart Sorting**: Multiple sorting options including "Most Wanted" algorithm
-- **Interactive Actions**: Claim items, mark as purchased, and contribute to funding
-- **Status Tracking**: Visual badges for Available, Claimed, and Purchased items
-- **Progress Bars**: Visual contribution tracking for crowdfunded items
-
-## 🚀 Quick Start
-
-### Option 1: Run with Sample Data (No Setup Required)
-
-1. Clone or download this repository
-2. Open `index.html` in your web browser
-3. The app will load with sample data automatically
-
-### Option 2: Connect to JSONBin.io (Full Functionality)
-
-1. **Create a JSONBin Account**
-   - Go to [jsonbin.io](https://jsonbin.io) and create a free account
-   - Create a new bin with the following initial data:
+The whole wishlist is one JSON document:
 
 ```json
 {
   "items": [
     {
-      "id": "phone-mount",
-      "title": "Custom Phone Mount",
-      "category": "Tesla Upgrades",
-      "status": "available",
-      "price": 39.99,
-      "priority": 1,
-      "dateAdded": "2024-01-15",
-      "links": [
-        {"label": "Buy at Amazon", "url": "https://amazon.com", "type": "primary"},
-        {"label": "Manufacturer", "url": "https://example.com", "type": "secondary"}
-      ]
-    },
-    {
-      "id": "strawberries",
-      "title": "Flavorfest Strawberries",
-      "category": "Garden & Orchard Tools",
-      "status": "available",
-      "priority": 2,
-      "dateAdded": "2024-01-08",
-      "contribution": {
-        "target": 150,
-        "raised": 60
-      },
-      "links": [
-        {"label": "Contribute", "url": "https://example.com", "type": "primary"}
-      ]
+      "id": "flir-one-gen-3",
+      "title": "FLIR ONE Gen 3 - Thermal Imaging Camera",
+      "price": 204,
+      "project": "home-improvement",
+      "rank": "S",
+      "vendor": "Amazon",
+      "image": "https://…",
+      "url": "https://…",
+      "purchased": false
     }
-  ]
+  ],
+  "projects": [
+    {
+      "id": "home-improvement",
+      "name": "Home Improvement",
+      "description": "House upgrades, tools, and lighting.",
+      "icon": "🛠️",
+      "color": "#EAB308",
+      "project-icon-image": "https://… (optional)"
+    }
+  ],
+  "auth": { "salt": "…", "iterations": 100000, "hash": "…" }
 }
 ```
 
-2. **Configure the App**
-   - Copy your Bin ID from the JSONBin dashboard
-   - Open `app.js` and update the configuration:
+`rank` is one of `S`, `A`, `B`, `C`. Fields the app doesn't recognise are kept as they are.
 
-```javascript
-const CONFIG = {
-    BIN_ID: "your_actual_bin_id_here",
-    API_KEY: "your_actual_api_key_here",
-    BASE_URL: "https://api.jsonbin.io/v3/b"
-};
+## Running locally
+
+Any static file server works. Serving over `localhost` is recommended because browsers only allow the Web Crypto API (used for admin login) in secure contexts.
+
+```bash
+python3 -m http.server 8000
+# or
+npx serve .
 ```
 
-3. **Deploy to GitHub Pages**
-   - Push your repository to GitHub
-   - Go to Settings → Pages → Deploy from main branch
-   - Live at `https://yourusername.github.io/wishlist-app/`
+Then open http://localhost:8000.
 
-## 📁 Project Structure
+## Deployment
+
+Pushing to `main` runs [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml), which:
+
+1. checks `app.js` for syntax errors,
+2. checks that every local file the page references (stylesheet, script, sounds) exists,
+3. publishes the site files to GitHub Pages.
+
+If either check fails, the live site is left unchanged.
+
+## Project structure
 
 ```
-wishlist-app/
-├── index.html          # Main HTML structure
-├── style.css           # Styling and theme
-├── app.js             # JavaScript logic and JSONBin integration
-└── README.md          # Documentation
+├── index.html                  Page shell and the pre-rendered home view
+├── app.js                      Data layer, router, views, admin, events
+├── style.css                   Dark theme and responsive layout
+├── sounds/                     Sound effects
+└── .github/workflows/deploy.yml
 ```
 
-## 🎨 Design Features
+## Roadmap
 
-- **Dark Theme**: Deep green and steel gray color palette
-- **Responsive Cards**: Clean, rounded cards with hover effects
-- **Status Badges**: Visual indicators for item availability
-- **Progress Bars**: Contribution tracking with percentage display
-- **Interactive Elements**: Smooth hover animations and transitions
+- Edit existing items and projects in the admin dashboard
+- "New season" reset for purchased items
+- Automated link and price checking
+- Visual redesign
+- Optional serverless proxy for writes
 
-## 🔧 Usage
+## License
 
-### Sorting Options
-- **Most Wanted**: Priority → Contribution % → Date added
-- **Price**: Low to high or high to low
-- **Category**: Alphabetical grouping
-- **Recently Added**: Newest items first
-
-### Item Actions
-- **Claim Item**: Mark an item as claimed by someone
-- **Mark Purchased**: Update status to purchased
-- **View Links**: Direct links to purchase or contribute
-
-## 🛡️ Security Notes
-
-- **Public API Key**: JSONBin key is visible in source (acceptable for this use case)
-- **Version History**: JSONBin maintains backups for data recovery
-- **Rate Limits**: Free JSONBin accounts have API call limits
-
-## 📱 Compatibility
-
-- Modern browsers (Chrome 80+, Firefox 75+, Safari 13+)
-- Mobile responsive design
-- No build tools required - runs directly in browser
-
----
-
-**Ready to use! Open `index.html` to get started.**
+MIT
