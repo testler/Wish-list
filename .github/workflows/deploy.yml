@@ -1,0 +1,53 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; let an in-progress deploy finish instead of cancelling it
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check JavaScript syntax
+        run: node --check app.js
+
+      - name: Check that every local file the site references exists
+        run: |
+          missing=0
+          for f in $(grep -ohE '(src|href)="[^":#?]+"' index.html | cut -d'"' -f2) \
+                   $(grep -ohE "sounds/[^']+" app.js); do
+            [ -f "$f" ] || { echo "::error::Missing file: $f"; missing=1; }
+          done
+          exit $missing
+
+      - name: Collect site files
+        run: rsync -a --exclude '.git*' --exclude 'README.md' --exclude '_site' ./ _site/
+
+      - uses: actions/configure-pages@v6
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5
