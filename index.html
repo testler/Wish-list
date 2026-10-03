@@ -12,30 +12,30 @@
     <div id="nav-overlay" class="nav-overlay" hidden>
         <div class="nav-sidebar">
             <div class="nav-header">
-                <button class="close-nav">×</button>
+                <button class="close-nav" data-action="menu-close" aria-label="Close menu">×</button>
             </div>
             <nav class="nav-menu">
-                <button class="nav-item" data-route="home">
+                <button class="nav-item" data-action="nav" data-route="home">
                     <span class="nav-icon">🏠</span>
                     <span class="nav-label">Home</span>
                 </button>
-                <button class="nav-item" data-route="under-20">
+                <button class="nav-item" data-action="nav" data-route="under-20">
                     <span class="nav-icon">💸</span>
                     <span class="nav-label">Under $20</span>
                 </button>
-                <button class="nav-item" data-route="30-items">
+                <button class="nav-item" data-action="nav" data-route="30-items">
                     <span class="nav-icon">🎯</span>
                     <span class="nav-label">$30 Items</span>
                 </button>
-                <button class="nav-item" data-route="by-rank">
+                <button class="nav-item" data-action="nav" data-route="by-rank">
                     <span class="nav-icon">⭐</span>
                     <span class="nav-label">By Priority</span>
                 </button>
-                <button class="nav-item" data-route="by-project">
+                <button class="nav-item" data-action="nav" data-route="by-project">
                     <span class="nav-icon">🏗️</span>
                     <span class="nav-label">By Project</span>
                 </button>
-                <button class="nav-item" data-route="purchased">
+                <button class="nav-item" data-action="nav" data-route="purchased">
                     <span class="nav-icon">✅</span>
                     <span class="nav-label">Purchased</span>
                 </button>
@@ -47,23 +47,24 @@
         <!-- Top Header -->
         <header class="top-header">
             <div class="header-content">
-                <button id="menu-btn" class="menu-btn tooltip" data-tooltip="Open navigation menu">
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                    <span class="hamburger"></span>
-                </button>
-                <div class="header-title clickable" id="home-title">
-                    <span class="gift-icon">🎁</span>
-                    <span class="title-text">Josh's Wishlist</span>
+                <div class="header-brand" data-action="nav" data-route="home" role="button" tabindex="0">
+                    <div class="header-icon">🎁</div>
+                    <div class="header-title">Josh's Wishlist</div>
                 </div>
+                <div class="header-subtitle" data-action="nav" data-route="home">A curated collection of birthday wishes organized just for you</div>
             </div>
         </header>
 
         <!-- Search Bar -->
         <div class="search-container">
+            <button id="menu-btn" class="menu-btn" data-action="menu-open" aria-label="Open navigation menu">
+                <span class="hamburger"></span>
+                <span class="hamburger"></span>
+                <span class="hamburger"></span>
+            </button>
             <div class="search-bar">
                 <span class="search-icon">🔍</span>
-                <input id="global-search" type="search" placeholder="Search gift ideas..." />
+                <input id="global-search" type="search" placeholder="Search gift ideas..." aria-label="Search gift ideas" />
             </div>
         </div>
 
@@ -73,13 +74,13 @@
                 <!-- Home page pre-rendered to prevent loading flash -->
                 <div id="home-content">
                     <div class="home-hero">
-                        <div class="hero-icon" id="secret-hero">🎁</div>
+                        <div class="hero-icon" id="secret-hero" data-action="secret-tap">🎁</div>
                         <h1 class="hero-title">Josh's Wishlist</h1>
                         <p class="hero-subtitle">A curated collection of birthday wishes organized just for you</p>
                     </div>
 
                     <div class="category-grid">
-                        <div class="category-card under-20" data-route="under-20">
+                        <div class="category-card under-20" data-action="nav" data-sfx="nav" data-route="under-20" role="button" tabindex="0">
                             <div class="category-header">
                                 <div class="category-icon">$</div>
                                 <div class="category-title">Under $20</div>
@@ -88,7 +89,7 @@
                             <div class="category-count" id="under20-count">Loading...</div>
                         </div>
 
-                        <div class="category-card thirty-items" data-route="30-items">
+                        <div class="category-card thirty-items" data-action="nav" data-sfx="nav" data-route="30-items" role="button" tabindex="0">
                             <div class="category-header">
                                 <div class="category-icon">🎯</div>
                                 <div class="category-title">$30 Items</div>
@@ -97,7 +98,7 @@
                             <div class="category-count" id="thirty-count">Loading...</div>
                         </div>
 
-                        <div class="category-card by-priority" data-route="by-rank">
+                        <div class="category-card by-priority" data-action="nav" data-sfx="nav" data-route="by-rank" role="button" tabindex="0">
                             <div class="category-header">
                                 <div class="category-icon">⭐</div>
                                 <div class="category-title">By Priority</div>
@@ -108,7 +109,7 @@
                             </div>
                         </div>
 
-                        <div class="category-card by-category" data-route="by-project">
+                        <div class="category-card by-category" data-action="nav" data-sfx="nav" data-route="by-project" role="button" tabindex="0">
                             <div class="category-header">
                                 <div class="category-icon">🏗️</div>
                                 <div class="category-title">By Project</div>
@@ -125,17 +126,17 @@
     </div>
 
     <!-- Purchase Confirmation Modal -->
-    <div id="purchase-modal" class="modal" aria-hidden="true" role="dialog" aria-modal="true" hidden>
+    <div id="purchase-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="purchase-title" hidden>
         <div class="modal-dialog">
             <header class="modal-header">
-                <h2>Confirm Purchase</h2>
-                <button class="icon-btn" id="purchase-modal-close" aria-label="Close">×</button>
+                <h2 id="purchase-title">Confirm Purchase</h2>
+                <button class="icon-btn modal-close" id="purchase-modal-close" data-action="close-modal" aria-label="Close">×</button>
             </header>
             <div class="modal-body">
                 <p id="purchase-confirm-text">Are you sure you want to mark this item as purchased?</p>
                 <footer class="modal-footer">
-                    <button type="button" class="btn btn-ghost" id="purchase-cancel">Cancel</button>
-                    <button type="button" class="btn btn-primary" id="purchase-confirm">Yes, Mark as Purchased</button>
+                    <button type="button" class="btn btn-ghost" id="purchase-cancel" data-action="close-modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="purchase-confirm" data-action="confirm-purchase">Yes, Mark as Purchased</button>
                 </footer>
             </div>
         </div>
