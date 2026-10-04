@@ -240,12 +240,14 @@
     };
 
     // Rendering helpers
+    const imgState = new Map(); // image url -> 'pending' | 'ok' | 'bad'
     const money = n => `$${n % 1 ? n.toFixed(2) : n}`;
     const projectOf = it => projects.find(p => p.id === it.project);
     const glyph = (it, hidden) => `<span class="tile-glyph" aria-hidden="true"${hidden ? ' hidden' : ''}>${esc(projectOf(it)?.icon || '🎁')}</span>`;
     const media = (it, alt = '') => {
         const img = safeUrl(it.image);
-        return img
+        // imgState is only filled in on the admin dashboard, where every photo gets checked
+        return img && imgState.get(img) !== 'bad'
             ? `<img src="${esc(img)}" alt="${esc(alt)}" loading="lazy" onerror="this.nextElementSibling.hidden=false; this.remove()">${glyph(it, true)}`
             : glyph(it);
     };
@@ -367,8 +369,40 @@
     };
 
     // Admin
+    let adminQuery = '', adminFilter = 'all', editing = null, editingProj = null;
+
+    // Load every gift photo once so the dashboard can flag the broken ones
+    const checkImages = () => {
+        const pending = [...new Set(items.map(i => safeUrl(i.image)).filter(u => u && !imgState.has(u)))];
+        let left = pending.length;
+        pending.forEach(u => {
+            imgState.set(u, 'pending');
+            const img = new Image();
+            img.onload = img.onerror = e => {
+                imgState.set(u, e.type === 'load' ? 'ok' : 'bad');
+                if (--left === 0 && route === 'admin' && adminTab === 'items') editing ? renderAdminStatus() : renderAdminList();
+            };
+            img.src = u;
+        });
+    };
+
+    const issues = it => {
+        const out = [];
+        const img = safeUrl(it.image);
+        if (!img) out.push('No image');
+        else if (imgState.get(img) === 'bad') out.push('Image broken');
+        if (!safeUrl(it.url)) out.push('No link');
+        if (!it.price) out.push('No price');
+        return out;
+    };
+
+    const byTierThenPrice = (a, b) => (RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank)) || (a.price - b.price);
+    const adminMatches = it => !adminQuery || `${it.title} ${it.vendor} ${projectOf(it)?.name || ''}`.toLowerCase().includes(adminQuery.toLowerCase());
+    const ADMIN_FILTERS = { all: ['All', () => true], fix: ['Needs a fix', it => issues(it).length > 0], bought: ['Bought', it => it.purchased] };
+    const pill = (text, kind = '') => `<span class="pill${kind ? ` pill-${kind}` : ''}">${text}</span>`;
+
     const loginView = () => `<form class="panel panel-narrow" data-form="login">
-            <h3>Admin</h3>
+            <h2 class="panel-title">Admin</h2>
             <div class="form-grid">
                 <div class="field"><label for="admin-pass">Password</label><input id="admin-pass" type="password" class="input" autocomplete="current-password"></div>
                 <p id="admin-error" class="form-error" hidden>That password isn't right.</p>
@@ -377,68 +411,161 @@
             </div>
         </form>`;
 
-    const adminItems = () => {
-        const projOpts = projects.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('');
-        return `<form class="panel" data-form="add-item"><h3>Add a gift</h3>
+    const tierPicker = rank => `<fieldset class="tier-pick wide"><legend>Tier</legend><div class="tier-pick-options">
+        ${RANKS.map(r => `<label class="tier-opt"><input type="radio" name="rank" value="${r}"${r === rank ? ' checked' : ''}>
+            <span class="tier-opt-box tier-${r}"><span class="tier-letter">${r}</span><span class="tier-word">${TIERS[r][0]}</span></span></label>`).join('')}
+        </div></fieldset>`;
+
+    const giftForm = (it = null) => {
+        const v = it || { title: '', price: '', vendor: '', project: '', rank: 'A', url: '', image: '', purchased: false };
+        const opts = projects.map(p => `<option value="${esc(p.id)}"${p.id === v.project ? ' selected' : ''}>${esc(p.icon)} ${esc(p.name)}</option>`).join('');
+        return `<form class="edit-form" data-form="save-gift" data-id="${it ? esc(it.id) : ''}">
             <div class="form-grid two">
-                <div class="field wide"><label for="n-name">Name</label><input id="n-name" class="input"></div>
-                <div class="field"><label for="n-price">Price</label><input id="n-price" type="number" min="0" step="any" class="input" value="0"></div>
-                <div class="field"><label for="n-vendor">Store</label><input id="n-vendor" class="input" placeholder="Amazon"></div>
-                <div class="field"><label for="n-proj">Project</label><select id="n-proj" class="input"><option value="">None</option>${projOpts}</select></div>
-                <div class="field"><label for="n-rank">Tier</label><select id="n-rank" class="input">${RANKS.map(r => `<option value="${r}"${r === 'A' ? ' selected' : ''}>${r}: ${TIERS[r][1]}</option>`).join('')}</select></div>
-                <div class="field wide"><label for="n-url">Link to the item</label><input id="n-url" class="input" placeholder="https://"></div>
-                <div class="field wide"><label for="n-image">Image link</label><input id="n-image" class="input" placeholder="https://"></div>
-                <label class="field-check wide"><input id="n-purchased" type="checkbox"> Already bought</label>
-                <div class="wide"><button type="submit" class="btn btn-primary">Add gift</button></div>
-            </div></form>
-            <div class="panel"><h3>Gifts (${items.length})</h3><div class="admin-list">
-            ${items.map(it => `<div class="admin-row"><div><div class="admin-row-title">${esc(it.title)}</div>
-                <div class="admin-row-sub">${it.rank} tier, ${money(it.price)}${it.purchased ? ', bought' : ''}</div></div>
-                <button class="btn btn-quiet" data-action="del-item" data-id="${esc(it.id)}">Delete</button></div>`).join('')}</div></div>`;
+                <div class="field wide"><label for="g-title">Name</label><input id="g-title" name="title" class="input" value="${esc(v.title)}"></div>
+                <div class="field"><label for="g-price">Price</label><input id="g-price" name="price" type="number" min="0" step="any" inputmode="decimal" class="input" value="${v.price === '' ? '' : v.price}"></div>
+                <div class="field"><label for="g-vendor">Store</label><input id="g-vendor" name="vendor" class="input" value="${esc(v.vendor)}" placeholder="Amazon"></div>
+                ${tierPicker(v.rank)}
+                <div class="field wide"><label for="g-project">Project</label><select id="g-project" name="project" class="input"><option value="">No project</option>${opts}</select></div>
+                <div class="field wide"><label for="g-url">Link to the gift</label><input id="g-url" name="url" class="input" inputmode="url" value="${esc(v.url)}" placeholder="https://"></div>
+                <div class="field wide"><label for="g-image">Image link</label>
+                    <div class="img-field"><span class="img-preview">${media(v)}</span><input id="g-image" name="image" class="input" inputmode="url" value="${esc(v.image)}" placeholder="https://"></div></div>
+                <label class="field-check wide"><input type="checkbox" name="purchased"${v.purchased ? ' checked' : ''}> Bought</label>
+                <div class="form-actions wide">
+                    <button type="submit" class="btn btn-primary">${it ? 'Save changes' : 'Add gift'}</button>
+                    <button type="button" class="btn btn-quiet" data-action="cancel-edit">Cancel</button>
+                    ${it ? `<button type="button" class="text-btn text-danger" data-action="del-item" data-id="${esc(it.id)}">Delete gift</button>` : ''}
+                </div>
+            </div></form>`;
     };
 
-    const adminProjects = () => `<form class="panel" data-form="add-proj"><h3>Add a project</h3>
-            <div class="form-grid two">
-                <div class="field wide"><label for="p-name">Name</label><input id="p-name" class="input"></div>
-                <div class="field wide"><label for="p-desc">Description</label><textarea id="p-desc" class="input"></textarea></div>
-                <div class="field"><label for="p-icon">Icon</label><input id="p-icon" class="input" value="📦"></div>
-                <div class="field"><label for="p-color">Color</label><input id="p-color" class="input" value="${DEFAULT_COLOR}"></div>
-                <div class="wide"><button type="submit" class="btn btn-primary">Add project</button></div>
-            </div></form>
-            <div class="panel"><h3>Projects (${projects.length})</h3><div class="admin-list">
-            ${projects.map(p => `<div class="admin-row"><div><div class="admin-row-title">${esc(p.icon)} ${esc(p.name)}</div>
-                <div class="admin-row-sub">${items.filter(i => i.project === p.id).length} gifts</div></div>
-                <button class="btn btn-quiet" data-action="del-proj" data-id="${esc(p.id)}">Delete</button></div>`).join('')}</div></div>`;
+    const giftRow = it => {
+        const proj = projectOf(it), flags = issues(it);
+        const sub = [it.vendor || hostOf(safeUrl(it.url)), proj?.name].filter(Boolean).map(esc).join(', ');
+        const open = editing === it.id;
+        return `<div class="arow${open ? ' is-open' : ''}">
+            <button class="arow-main" data-action="edit" data-id="${esc(it.id)}" aria-expanded="${open}">
+                <span class="arow-thumb">${media(it)}</span>
+                <span class="arow-text">
+                    <span class="arow-title">${esc(it.title)}</span>
+                    ${sub ? `<span class="arow-sub">${sub}</span>` : ''}
+                    ${flags.length || it.purchased ? `<span class="arow-flags">${it.purchased ? pill('Bought') : ''}${flags.map(f => pill(f, 'warn')).join('')}</span>` : ''}
+                </span>
+                <span class="arow-end"><span class="arow-tier tier-${it.rank}">${it.rank}</span><span class="arow-price">${money(it.price)}</span></span>
+            </button>
+            ${it.purchased && !open ? `<div class="arow-extra"><button class="text-btn" data-action="undo-buy" data-id="${esc(it.id)}">Undo purchase</button></div>` : ''}
+            ${open ? giftForm(it) : ''}
+        </div>`;
+    };
 
-    const adminSettings = () => `<form class="panel panel-narrow" data-form="change-pass"><h3>Change password</h3>
+    const adminStatus = () => Object.entries(ADMIN_FILTERS).map(([key, [label, test]]) =>
+        `<button class="chip" data-action="admin-filter" data-filter="${key}" aria-pressed="${adminFilter === key}">${label} <span class="chip-count">${items.filter(test).length}</span></button>`).join('');
+
+    const adminRows = () => {
+        const list = items.filter(it => adminMatches(it) && ADMIN_FILTERS[adminFilter][1](it)).sort(byTierThenPrice);
+        const empty = adminFilter === 'fix' && !adminQuery ? 'Nothing needs fixing.' : 'No gifts match.';
+        return `${editing === 'new' ? `<div class="arow is-open is-new"><h3 class="arow-heading">New gift</h3>${giftForm()}</div>` : ''}
+            ${list.length ? list.map(giftRow).join('') : `<p class="admin-empty">${empty}</p>`}`;
+    };
+
+    const renderAdminStatus = () => { const el = $('admin-status'); if (el) el.innerHTML = adminStatus(); };
+    const renderAdminList = () => {
+        const el = $('admin-list');
+        if (!el) return;
+        renderAdminStatus();
+        el.innerHTML = adminRows();
+    };
+
+    const projectForm = (p = null) => {
+        const v = p || { name: '', description: '', icon: '📦', color: DEFAULT_COLOR };
+        return `<form class="edit-form" data-form="save-proj" data-id="${p ? esc(p.id) : ''}">
+            <div class="form-grid two">
+                <div class="field wide"><label for="p-name">Name</label><input id="p-name" name="name" class="input" value="${esc(v.name)}"></div>
+                <div class="field wide"><label for="p-desc">Description</label><textarea id="p-desc" name="description" class="input">${esc(v.description)}</textarea></div>
+                <div class="field"><label for="p-icon">Icon</label><input id="p-icon" name="icon" class="input" value="${esc(v.icon)}"></div>
+                <div class="field"><label for="p-color">Color</label><input id="p-color" name="color" type="color" class="input input-color" value="${esc(v.color)}"></div>
+                <div class="form-actions wide">
+                    <button type="submit" class="btn btn-primary">${p ? 'Save changes' : 'Add project'}</button>
+                    <button type="button" class="btn btn-quiet" data-action="cancel-edit">Cancel</button>
+                    ${p ? `<button type="button" class="text-btn text-danger" data-action="del-proj" data-id="${esc(p.id)}">Delete project</button>` : ''}
+                </div>
+            </div></form>`;
+    };
+
+    const projectRow = p => {
+        const open = editingProj === p.id;
+        const count = items.filter(i => i.project === p.id).length;
+        return `<div class="arow${open ? ' is-open' : ''}">
+            <button class="arow-main" data-action="edit-proj" data-id="${esc(p.id)}" aria-expanded="${open}">
+                <span class="arow-thumb arow-icon" style="background:${p.color}33">${esc(p.icon)}</span>
+                <span class="arow-text"><span class="arow-title">${esc(p.name)}</span>
+                    ${p.description ? `<span class="arow-sub">${esc(p.description)}</span>` : ''}</span>
+                <span class="arow-end"><span class="arow-price">${count} gift${count === 1 ? '' : 's'}</span></span>
+            </button>
+            ${open ? projectForm(p) : ''}
+        </div>`;
+    };
+
+    const adminGifts = () => `<div class="admin-toolbar">
+            <label class="search"><svg class="search-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m15.5 15.5 5 5"/></svg>
+                <input id="admin-search" type="search" placeholder="Search gifts" aria-label="Search gifts" autocomplete="off" value="${esc(adminQuery)}"></label>
+            <button class="btn btn-primary" data-action="new-gift">Add gift</button>
+        </div>
+        <div class="chips admin-status" id="admin-status" role="group" aria-label="Show">${adminStatus()}</div>
+        <div class="admin-list" id="admin-list">${adminRows()}</div>`;
+
+    const adminProjects = () => `<div class="admin-toolbar admin-toolbar-end"><button class="btn btn-primary" data-action="new-proj">Add project</button></div>
+        <div class="admin-list">
+            ${editingProj === 'new' ? `<div class="arow is-open is-new"><h3 class="arow-heading">New project</h3>${projectForm()}</div>` : ''}
+            ${projects.map(projectRow).join('')}
+        </div>`;
+
+    const adminSettings = () => `<form class="panel panel-narrow" data-form="change-pass"><h2 class="panel-title">Change password</h2>
             <div class="form-grid">
                 <div class="field"><label for="new-pass">New password</label><input id="new-pass" type="password" class="input" autocomplete="new-password"></div>
                 <button type="submit" class="btn btn-primary">Change password</button>
             </div></form>`;
 
-    const ADMIN_TABS = { items: ['Gifts', adminItems], projects: ['Projects', adminProjects], settings: ['Password', adminSettings] };
+    const ADMIN_TABS = {
+        items: [() => `Gifts <span class="chip-count">${items.length}</span>`, adminGifts],
+        projects: [() => `Projects <span class="chip-count">${projects.length}</span>`, adminProjects],
+        settings: [() => 'Password', adminSettings]
+    };
 
-    const adminView = () => `<div class="admin-bar"><h2>Admin</h2>
-            <div class="admin-bar-actions"><button class="text-btn" data-action="go" data-route="list">View list</button>
-            <button class="btn btn-outline" data-action="logout">Log out</button></div></div>
-            <div class="admin-tabs">${Object.entries(ADMIN_TABS).map(([key, [label]]) =>
-                `<button class="chip" data-action="tab" data-tab="${key}" aria-pressed="${adminTab === key}">${label}</button>`).join('')}</div>
-            ${(ADMIN_TABS[adminTab] || ADMIN_TABS.items)[1]()}`;
+    const adminView = () => `<div class="admin-bar">
+            <p class="admin-brand"><span class="admin-wordmark">Josh<span class="apos">’</span>s Wishlist</span> Admin</p>
+            <div class="admin-bar-actions"><button class="admin-link" data-action="go" data-route="list">View list</button>
+            <button class="admin-link" data-action="logout">Log out</button></div>
+        </div>
+        <div class="chips admin-tabs" role="group" aria-label="Section">${Object.entries(ADMIN_TABS).map(([key, [label]]) =>
+            `<button class="chip" data-action="tab" data-tab="${key}" aria-pressed="${adminTab === key}">${label()}</button>`).join('')}</div>
+        ${(ADMIN_TABS[adminTab] || ADMIN_TABS.items)[1]()}`;
 
     const render = () => {
         if (route === 'admin' && !admin) route = 'admin-login';
         if (project && !projects.some(p => p.id === project)) project = '';
         const onList = route === 'list';
+        document.body.classList.toggle('is-admin', route === 'admin');
         $('list-view').hidden = !onList;
         $('admin-view').hidden = onList;
         if (onList) {
             $('admin-view').innerHTML = '';
             renderChips();
             renderTiers();
+        } else if (route === 'admin') {
+            $('admin-view').innerHTML = adminView();
+            checkImages();
         } else {
-            $('admin-view').innerHTML = route === 'admin' ? adminView() : loginView();
+            $('admin-view').innerHTML = loginView();
         }
     };
+
+    // Open an editor in place and put the cursor in its first field
+    const focusEditor = () => requestAnimationFrame(() => {
+        const form = $('admin-view').querySelector('.edit-form');
+        if (!form) return;
+        form.closest('.arow').scrollIntoView({ block: 'nearest' });
+        form.querySelector('input')?.focus({ preventScroll: true });
+    });
 
     // Admin actions
     const saveAndRender = async (fn, done) => {
@@ -458,20 +585,55 @@
             store.set('wishlist-admin', true);
             go('admin');
         },
-        'add-item': async () => {
-            const title = $('n-name').value.trim();
+        'save-gift': async form => {
+            const fd = new FormData(form), id = form.dataset.id;
+            const text = k => String(fd.get(k) ?? '').trim();
+            const title = text('title');
             if (!title) return toast('Give the gift a name first.');
             const fields = {
-                title, price: toPrice($('n-price').value), vendor: $('n-vendor').value.trim(), project: $('n-proj').value,
-                rank: $('n-rank').value || 'A', image: $('n-image').value.trim(), url: $('n-url').value.trim(), purchased: $('n-purchased').checked
+                title, price: toPrice(fd.get('price')), vendor: text('vendor'), project: text('project'), rank: text('rank') || 'A',
+                url: text('url'), image: text('image'), purchased: fd.get('purchased') === 'on'
             };
-            await saveAndRender(rec => { rec.items.push({ id: uniqueId(slug(title), new Set(rec.items.map(i => i.id))), ...fields }); }, 'Gift added');
+            const btn = form.querySelector('[type="submit"]');
+            btn.disabled = true;
+            try {
+                let gone = false;
+                await mutate(rec => {
+                    if (!id) { rec.items.push({ id: uniqueId(slug(title), new Set(rec.items.map(i => i.id))), ...fields }); return; }
+                    const it = rec.items.find(i => i.id === id);
+                    if (!it) { gone = true; return false; }
+                    Object.assign(it, fields);
+                });
+                editing = null;
+                toast(gone ? 'That gift was deleted somewhere else.' : id ? 'Changes saved' : 'Gift added');
+                render();
+            } catch {
+                btn.disabled = false;
+                toast(SAVE_FAIL);
+            }
         },
-        'add-proj': async () => {
-            const name = $('p-name').value.trim();
+        'save-proj': async form => {
+            const fd = new FormData(form), id = form.dataset.id;
+            const text = k => String(fd.get(k) ?? '').trim();
+            const name = text('name');
             if (!name) return toast('Give the project a name first.');
-            const fields = { name, description: $('p-desc').value.trim(), icon: $('p-icon').value || '📦', color: $('p-color').value.trim() };
-            await saveAndRender(rec => { rec.projects.push({ id: uniqueId(slug(name), new Set(rec.projects.map(p => p.id))), ...fields }); }, 'Project added');
+            const fields = { name, description: text('description'), icon: text('icon') || '📦', color: text('color') };
+            const btn = form.querySelector('[type="submit"]');
+            btn.disabled = true;
+            try {
+                await mutate(rec => {
+                    if (!id) { rec.projects.push({ id: uniqueId(slug(name), new Set(rec.projects.map(p => p.id))), ...fields }); return; }
+                    const p = rec.projects.find(x => x.id === id);
+                    if (!p) return false;
+                    Object.assign(p, fields);
+                });
+                editingProj = null;
+                toast(id ? 'Changes saved' : 'Project added');
+                render();
+            } catch {
+                btn.disabled = false;
+                toast(SAVE_FAIL);
+            }
         },
         'change-pass': async () => {
             const pass = $('new-pass').value.trim();
@@ -500,18 +662,32 @@
         },
         go: el => go(el.dataset.route),
         logout: () => { admin = false; store.del('wishlist-admin'); go('list'); },
-        tab: el => { adminTab = el.dataset.tab; render(); },
+        tab: el => { adminTab = el.dataset.tab; editing = editingProj = null; render(); },
+        'admin-filter': el => { adminFilter = el.dataset.filter; editing = null; renderAdminList(); },
+        edit: el => { editing = editing === el.dataset.id ? null : el.dataset.id; renderAdminList(); focusEditor(); },
+        'new-gift': () => { editing = 'new'; renderAdminList(); focusEditor(); },
+        'edit-proj': el => { editingProj = editingProj === el.dataset.id ? null : el.dataset.id; render(); focusEditor(); },
+        'new-proj': () => { editingProj = 'new'; render(); focusEditor(); },
+        'cancel-edit': () => { editing = editingProj = null; render(); },
+        'undo-buy': el => saveAndRender(rec => {
+            const it = rec.items.find(i => i.id === el.dataset.id);
+            if (!it || !it.purchased) return false;
+            it.purchased = false;
+        }, 'Purchase undone'),
         'del-item': el => {
             const it = items.find(i => i.id === el.dataset.id);
-            if (it && confirm(`Delete "${it.title}"?`)) saveAndRender(rec => { rec.items = rec.items.filter(i => i.id !== it.id); }, 'Deleted');
+            if (!it || !confirm(`Delete "${it.title}"? This can't be undone.`)) return;
+            editing = null;
+            saveAndRender(rec => { rec.items = rec.items.filter(i => i.id !== it.id); }, 'Gift deleted');
         },
         'del-proj': el => {
             const p = projects.find(x => x.id === el.dataset.id);
-            if (!p || !confirm(`Delete "${p.name}"?`)) return;
+            if (!p || !confirm(`Delete the "${p.name}" project? Its gifts stay on the list without a project.`)) return;
+            editingProj = null;
             saveAndRender(rec => {
                 rec.items.forEach(i => { if (i.project === p.id) i.project = ''; });
                 rec.projects = rec.projects.filter(x => x.id !== p.id);
-            }, 'Deleted');
+            }, 'Project deleted');
         }
     };
 
@@ -528,6 +704,14 @@
             forms[form.dataset.form](form);
         });
         $('search').addEventListener('input', e => { query = e.target.value.trim(); renderTiers(); });
+        $('admin-view').addEventListener('input', e => {
+            if (e.target.id === 'admin-search') { adminQuery = e.target.value.trim(); editing = null; renderAdminList(); }
+            // Live preview while pasting a new image link
+            if (e.target.name === 'image') e.target.closest('.img-field').querySelector('.img-preview').innerHTML = media({ image: e.target.value });
+        });
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape' && route === 'admin' && (editing || editingProj)) actions['cancel-edit']();
+        });
         // Tapping the dimmed backdrop closes the sheet
         sheet.addEventListener('click', e => { if (e.target === sheet) sheet.close(); });
         sheet.addEventListener('close', () => {

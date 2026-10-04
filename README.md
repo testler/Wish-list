@@ -10,7 +10,9 @@ A fast, dependency-free wishlist web app laid out as a tier list. Friends and fa
 - **Filter in place:** budget (up to $20 / $30 / $50 / $100), project, and search all narrow the same list, with no extra pages to dig through.
 - **Shareable views:** filters and the open gift live in the URL, so "everything under $30 in Garden" or a single gift can be sent as a link.
 - **Purchase tracking that handles more than one shopper.** Marking a gift as bought takes a confirmation, stamps it "Bought", and removes it from the list. If two people go for the same gift, the second one is told it's already taken, so nobody's purchase is silently lost.
-- **Admin dashboard** behind a hidden gesture and password: add or delete gifts and projects, and change the password.
+- **Admin dashboard** behind a hidden gesture and password: search, add, edit and delete gifts and projects in place, undo a purchase made by mistake, and change the password.
+- **"Needs a fix" view:** the dashboard loads every gift photo and flags broken or missing images, missing links and $0 prices, so stale entries are easy to find.
+- **Custom 404 page** in the same style, pointing back to the list.
 - **Offline fallback:** if the data service can't be reached, the last copy the browser saw is shown, read-only.
 - **Built for phones:** large tap targets, a bottom sheet for gift details that the phone's back button closes, visible keyboard focus, and reduced motion respected.
 - **Small extras:** retro sound effects when opening a gift, unlocking admin, and marking a gift as bought.
@@ -114,7 +116,8 @@ If either check fails, the live site is left unchanged.
 ## Project structure
 
 ```
-├── index.html                  Page shell and the pre-rendered home view
+├── index.html                  Page shell and the pre-rendered tier list
+├── 404.html                    Self-contained "page not found" screen
 ├── app.js                      Data layer, router, views, admin, events
 ├── style.css                   Design tokens, tier list, sheet, responsive layout
 ├── sounds/                     Sound effects
@@ -123,7 +126,6 @@ If either check fails, the live site is left unchanged.
 
 ## Roadmap
 
-- Edit existing items and projects in the admin dashboard
 - "New season" reset for purchased items
 - Automated link and price checking
 - Optional serverless proxy for writes
