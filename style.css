@@ -464,6 +464,18 @@ button { cursor: pointer; }
     margin-top: 20px;
 }
 
+.sheet-why {
+    margin-top: 14px;
+    max-width: 60ch;
+}
+
+.sheet-notes {
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: var(--page);
+    border-left: 4px solid var(--action);
+}
+
 .sheet-note { color: var(--ink-soft); }
 .sheet-note strong { color: var(--ink); }
 

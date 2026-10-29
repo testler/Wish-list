@@ -7,6 +7,7 @@ A fast, dependency-free wishlist web app laid out as a tier list. Friends and fa
 ## Features
 
 - **The home page is the tier list.** Every gift sits in an S / A / B / C row with its price on the thumbnail, so the most-wanted gifts are the first thing anyone sees.
+- **Every gift explains itself.** Opening a gift shows why I want it and a "Good to know" note for anything a buyer needs, like an exact model, a size, or a part it needs to work.
 - **Filter in place:** budget (up to $20 / $30 / $50 / $100), project, and search all narrow the same list, with no extra pages to dig through.
 - **Shareable views:** filters and the open gift live in the URL, so "everything under $30 in Garden" or a single gift can be sent as a link.
 - **Purchase tracking that handles more than one shopper.** Marking a gift as bought takes a confirmation, stamps it "Bought", and removes it from the list. If two people go for the same gift, the second one is told it's already taken, so nobody's purchase is silently lost.
@@ -72,6 +73,8 @@ The whole wishlist is one JSON document:
       "vendor": "Amazon",
       "image": "https://…",
       "url": "https://…",
+      "why": "Find every draft and leak in our 1970s house.",
+      "notes": "iPhone version.",
       "purchased": false
     }
   ],

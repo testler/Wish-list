@@ -107,6 +107,8 @@
                 vendor: String(i.vendor ?? '').trim(),
                 image: String(i.image ?? '').trim(),
                 url: String(i.url || i.links?.[0]?.url || '').trim(),
+                why: String(i.why ?? '').trim(),
+                notes: String(i.notes ?? '').trim(),
                 purchased: i.purchased === true || i.purchased === 'true'
             };
         });
@@ -251,7 +253,7 @@
             ? `<img src="${esc(img)}" alt="${esc(alt)}" loading="lazy" onerror="this.nextElementSibling.hidden=false; this.remove()">${glyph(it, true)}`
             : glyph(it);
     };
-    const matches = i => !query || `${i.title} ${i.vendor} ${projectOf(i)?.name || ''}`.toLowerCase().includes(query.toLowerCase());
+    const matches = i => !query || `${i.title} ${i.vendor} ${i.why} ${projectOf(i)?.name || ''}`.toLowerCase().includes(query.toLowerCase());
     const inFilters = i => (!budget || i.price <= budget) && (!project || i.project === project) && matches(i);
     const filtered = () => Boolean(budget || project || query);
 
@@ -326,6 +328,8 @@
                 <h2 class="sheet-title" id="sheet-title">${esc(it.title)}</h2>
                 <p class="sheet-price">${money(it.price)}</p>
                 ${vendor || proj ? `<p class="sheet-meta">${vendor ? `From ${esc(vendor)}` : ''}${vendor && proj ? ', for' : proj ? 'For' : ''}${proj ? ` my ${esc(proj.name)} project` : ''}</p>` : ''}
+                ${it.why ? `<p class="sheet-why">${esc(it.why)}</p>` : ''}
+                ${it.notes ? `<p class="sheet-notes"><strong>Good to know:</strong> ${esc(it.notes)}</p>` : ''}
                 <div class="sheet-actions">${actions}</div>
             </div>`;
     };
@@ -417,7 +421,7 @@
         </div></fieldset>`;
 
     const giftForm = (it = null) => {
-        const v = it || { title: '', price: '', vendor: '', project: '', rank: 'A', url: '', image: '', purchased: false };
+        const v = it || { title: '', price: '', vendor: '', project: '', rank: 'A', url: '', image: '', why: '', notes: '', purchased: false };
         const opts = projects.map(p => `<option value="${esc(p.id)}"${p.id === v.project ? ' selected' : ''}>${esc(p.icon)} ${esc(p.name)}</option>`).join('');
         return `<form class="edit-form" data-form="save-gift" data-id="${it ? esc(it.id) : ''}">
             <div class="form-grid two">
@@ -426,6 +430,8 @@
                 <div class="field"><label for="g-vendor">Store</label><input id="g-vendor" name="vendor" class="input" value="${esc(v.vendor)}" placeholder="Amazon"></div>
                 ${tierPicker(v.rank)}
                 <div class="field wide"><label for="g-project">Project</label><select id="g-project" name="project" class="input"><option value="">No project</option>${opts}</select></div>
+                <div class="field wide"><label for="g-why">Why I want it</label><textarea id="g-why" name="why" class="input">${esc(v.why)}</textarea></div>
+                <div class="field wide"><label for="g-notes">Good to know (size, exact model, what it needs)</label><input id="g-notes" name="notes" class="input" value="${esc(v.notes)}"></div>
                 <div class="field wide"><label for="g-url">Link to the gift</label><input id="g-url" name="url" class="input" inputmode="url" value="${esc(v.url)}" placeholder="https://"></div>
                 <div class="field wide"><label for="g-image">Image link</label>
                     <div class="img-field"><span class="img-preview">${media(v)}</span><input id="g-image" name="image" class="input" inputmode="url" value="${esc(v.image)}" placeholder="https://"></div></div>
@@ -592,7 +598,7 @@
             if (!title) return toast('Give the gift a name first.');
             const fields = {
                 title, price: toPrice(fd.get('price')), vendor: text('vendor'), project: text('project'), rank: text('rank') || 'A',
-                url: text('url'), image: text('image'), purchased: fd.get('purchased') === 'on'
+                url: text('url'), image: text('image'), why: text('why'), notes: text('notes'), purchased: fd.get('purchased') === 'on'
             };
             const btn = form.querySelector('[type="submit"]');
             btn.disabled = true;
