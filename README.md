@@ -6,16 +6,16 @@ A fast, dependency-free wishlist web app laid out as a tier list. Friends and fa
 
 ## Features
 
-- **The home page is the tier list.** Every gift sits in an S / A / B / C row with its price on the thumbnail, so the most-wanted gifts are the first thing anyone sees.
+- **The home page is the tier list.** Every gift sits in an S / A / B / C row (Dream gift, Really want, Would like, Nice to have) as a card with its photo, name and price, so the most-wanted gifts are the first thing anyone sees.
 - **Every gift explains itself.** Opening a gift shows why I want it and a "Good to know" note for anything a buyer needs, like an exact model, a size, or a part it needs to work.
 - **Filter in place:** budget (up to $20 / $30 / $50 / $100), project, and search all narrow the same list, with no extra pages to dig through.
 - **Shareable views:** filters and the open gift live in the URL, so "everything under $30 in Garden" or a single gift can be sent as a link.
-- **Purchase tracking that handles more than one shopper.** Marking a gift as bought takes a confirmation, stamps it "Bought", and removes it from the list. If two people go for the same gift, the second one is told it's already taken, so nobody's purchase is silently lost.
+- **Purchase tracking that handles more than one shopper.** Marking a gift as bought takes a confirmation, stamps it "Bought", and removes it from the list. A shopper who marks one by mistake can undo it right away. If two people go for the same gift, the second one is told it's already taken, so nobody's purchase is silently lost.
 - **Admin dashboard** behind a hidden gesture and password: search, add, edit and delete gifts and projects in place, undo a purchase made by mistake, and change the password.
 - **"Needs a fix" view:** the dashboard loads every gift photo and flags broken or missing images, missing links and $0 prices, so stale entries are easy to find.
 - **Custom 404 page** in the same style, pointing back to the list.
 - **Offline fallback:** if the data service can't be reached, the last copy the browser saw is shown, read-only.
-- **Built for phones:** large tap targets, a bottom sheet for gift details that the phone's back button closes, visible keyboard focus, and reduced motion respected.
+- **Built for phones, and for family who aren't techy:** two big gift cards per row, tier headers that stay pinned while scrolling, a project dropdown instead of a wall of buttons, tap targets of at least 44 px, and a bottom sheet for gift details with a plain "Back to all gifts" button that the phone's back button also closes.
 - **Small extras:** retro sound effects when opening a gift, unlocking admin, and marking a gift as bought.
 
 ## Tech stack

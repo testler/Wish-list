@@ -259,7 +259,9 @@
 
     // The tier list
     const tile = it => `<button class="tile${it.purchased ? ' is-bought' : ''}" data-action="open" data-id="${esc(it.id)}"
-        aria-label="${esc(it.title)}, ${money(it.price)}${it.purchased ? ', already bought' : ''}">${media(it)}<span class="tag">${it.purchased ? 'Bought' : money(it.price)}</span></button>`;
+        aria-label="${esc(it.title)}, ${money(it.price)}${it.purchased ? ', already bought' : ''}">
+        <span class="tile-media">${media(it)}${it.purchased ? '<span class="tag">Bought</span>' : ''}</span>
+        <span class="tile-name">${esc(it.title)}</span><span class="tile-price">${money(it.price)}</span></button>`;
 
     const renderTiers = () => {
         const shown = items.filter(inFilters);
@@ -267,13 +269,13 @@
         const bought = shown.length - open;
         const empty = filtered() ? 'Nothing here with these filters' : 'Nothing here yet';
 
-        $('tiers').innerHTML = RANKS.map(r => {
-            const row = shown.filter(i => i.rank === r && (showBought || !i.purchased))
-                .sort((a, b) => (a.purchased - b.purchased) || (a.price - b.price));
-            return `<div class="tier" role="group" aria-label="${r} tier, ${TIERS[r][1]}">
-                <div class="tier-label tier-${r}"><span class="tier-badge"><span class="tier-letter">${r}</span><span class="tier-word">${TIERS[r][0]}</span></span></div>
-                <div class="tier-items">${row.length ? row.map(tile).join('') : `<p class="tier-empty">${empty}</p>`}</div></div>`;
-        }).join('');
+        // Empty tiers are left out so a filtered list doesn't fill up with "nothing here" rows
+        const rows = RANKS.map(r => [r, shown.filter(i => i.rank === r && (showBought || !i.purchased))
+            .sort((a, b) => (a.purchased - b.purchased) || (a.price - b.price))]).filter(([, row]) => row.length);
+        $('tiers').innerHTML = rows.length ? rows.map(([r, row]) => `<div class="tier" role="group" aria-label="${r} tier, ${TIERS[r][1]}">
+                <div class="tier-label tier-${r}"><span class="tier-badge"><span class="tier-letter">${r}</span><span class="tier-word">${TIERS[r][1]}</span></span></div>
+                <div class="tier-items">${row.map(tile).join('')}</div></div>`).join('')
+            : `<p class="tier-empty">${empty}</p>`;
 
         const proj = projects.find(p => p.id === project);
         const where = `${budget ? ` up to $${budget}` : ''}${proj ? ` in ${proj.name}` : ''}${query ? ` matching “${query}”` : ''}`;
@@ -289,16 +291,25 @@
         toggle.textContent = showBought ? `Hide the ${bought} already bought` : `Show ${bought} already bought`;
     };
 
-    let chipKey = '';
+    let chipKey = '', optionKey = '';
     const renderChips = () => {
         const openCount = id => items.filter(i => i.project === id && !i.purchased).length;
         const sorted = [...projects].sort((a, b) => openCount(b.id) - openCount(a.id));
+        const inBudget = id => items.filter(i => i.project === id && !i.purchased && (!budget || i.price <= budget)).length;
         const key = sorted.map(p => `${p.id}:${p.name}:${p.icon}`).join('|');
         if (key !== chipKey) { // only rebuild when projects change, so keyboard focus stays put
             chipKey = key;
             $('project-chips').innerHTML = `<button class="chip" data-action="project" data-project="">All projects</button>` +
                 sorted.map(p => `<button class="chip" data-action="project" data-project="${esc(p.id)}">${esc(p.icon)} ${esc(p.name)}</button>`).join('');
         }
+        // Phones get a dropdown instead of the chips, with how many gifts each project has
+        const optKey = key + sorted.map(p => inBudget(p.id)).join();
+        if (optKey !== optionKey) {
+            optionKey = optKey;
+            $('project-select').innerHTML = `<option value="">All projects</option>` +
+                sorted.map(p => `<option value="${esc(p.id)}">${esc(p.icon)} ${esc(p.name)} (${inBudget(p.id)})</option>`).join('');
+        }
+        $('project-select').value = project;
         $$('[data-action="budget"]').forEach(c => c.setAttribute('aria-pressed', String((Number(c.dataset.budget) || 0) === budget)));
         $$('[data-action="project"]').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.project === project)));
     };
@@ -311,13 +322,17 @@
         if (!it) return sheet.close();
         const link = safeUrl(it.url), vendor = it.vendor || hostOf(link);
         const proj = projectOf(it);
-        const view = link ? `<a class="btn ${it.purchased ? 'btn-quiet' : 'btn-primary'}" href="${esc(link)}" target="_blank" rel="noopener noreferrer">View at ${esc(vendor || 'the store')}</a>` : '';
+        const view = link ? `<a class="btn ${it.purchased ? 'btn-outline' : 'btn-primary'}" href="${esc(link)}" target="_blank" rel="noopener noreferrer">View at ${esc(vendor || 'the store')}</a>` : '';
+        const back = '<button class="btn btn-quiet" data-action="close-sheet">Back to all gifts</button>';
         const actions = it.purchased
-            ? `<p class="sheet-note"><strong>Someone is already getting this one.</strong> Pick another gift so it isn't bought twice.</p>${view}`
+            ? justBought === it.id
+                ? `<p class="sheet-note"><strong>Thank you! It's marked as bought,</strong> so nobody else will get it.</p>${view}
+                   <button class="text-btn" data-action="undo-mine">Oops, I didn't buy it</button>${back}`
+                : `<p class="sheet-note"><strong>Someone is already getting this one.</strong> Pick another gift so it isn't bought twice.</p>${view}${back}`
             : sheetMode === 'confirm'
                 ? `<p class="sheet-note"><strong>Mark this as bought?</strong> Everyone else will see it's taken, so nobody buys it twice.</p>
                    <div class="btn-row"><button class="btn btn-primary" data-action="confirm-buy">Yes, mark as bought</button><button class="btn btn-quiet" data-action="cancel-buy">Cancel</button></div>`
-                : `${view}<button class="btn btn-outline" data-action="buy">Mark as bought</button>`;
+                : `${view}<button class="btn btn-outline" data-action="buy">Mark as bought</button>${back}`;
 
         sheet.innerHTML = `<div class="sheet-media">${media(it, it.title)}
                 <span class="sheet-tier"><span class="tier-letter tier-${it.rank}">${it.rank}</span>${TIERS[it.rank][1]}</span>
@@ -360,7 +375,7 @@
             if (outcome === 'bought') {
                 justBought = id;
                 sfx(SFX.purchase);
-                toast('Marked as bought. Thank you!');
+                if (!sheet.open) toast('Marked as bought. Thank you!'); // the open sheet already says so
             } else {
                 toast(outcome === 'taken' ? 'Someone already bought this one.' : 'That gift was taken off the list.');
             }
@@ -368,6 +383,26 @@
         } catch {
             btn.disabled = false;
             btn.textContent = 'Yes, mark as bought';
+            toast(SAVE_FAIL);
+        }
+    };
+
+    // Lets someone take back a purchase they marked by mistake, but only from the same open sheet
+    const undoMine = async btn => {
+        const id = justBought;
+        btn.disabled = true;
+        try {
+            await mutate(rec => {
+                const it = rec.items.find(i => i.id === id);
+                if (!it || !it.purchased) return false;
+                it.purchased = false;
+            });
+            justBought = null;
+            render();
+            toast("Okay, it's back on the list.");
+            if (sheet.open) renderSheet();
+        } catch {
+            btn.disabled = false;
             toast(SAVE_FAIL);
         }
     };
@@ -656,6 +691,7 @@
         buy: () => { sheetMode = 'confirm'; renderSheet(); sheet.querySelector('[data-action="confirm-buy"]').focus(); },
         'cancel-buy': () => { sheetMode = 'view'; renderSheet(); },
         'confirm-buy': el => { if (!el.disabled) confirmBuy(el); },
+        'undo-mine': el => { if (!el.disabled && justBought) undoMine(el); },
         budget: el => { budget = Number(el.dataset.budget) || 0; writeUrl(false); render(); },
         project: el => { project = el.dataset.project; writeUrl(false); render(); },
         'clear-filters': () => { budget = 0; project = ''; query = ''; $('search').value = ''; writeUrl(false); render(); },
@@ -710,6 +746,7 @@
             forms[form.dataset.form](form);
         });
         $('search').addEventListener('input', e => { query = e.target.value.trim(); renderTiers(); });
+        $('project-select').addEventListener('change', e => { project = e.target.value; writeUrl(false); render(); });
         $('admin-view').addEventListener('input', e => {
             if (e.target.id === 'admin-search') { adminQuery = e.target.value.trim(); editing = null; renderAdminList(); }
             // Live preview while pasting a new image link

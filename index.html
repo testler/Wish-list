@@ -20,7 +20,7 @@
     <div class="page">
         <header class="masthead">
             <h1 class="wordmark" data-action="secret-tap"><span>Josh<span class="apos">’</span>s</span> <span>Wishlist</span></h1>
-            <p class="intro">Gift ideas for my birthday and Christmas, ranked by how much I want them. Tap one to see it.</p>
+            <p class="intro">Gift ideas for my birthday and Christmas, ranked by how much I want them. Tap any gift to see more. Bought one? Mark it as bought so nobody doubles up.</p>
         </header>
 
         <main id="main">
@@ -45,6 +45,7 @@
                         <div class="chips" id="project-chips">
                             <button class="chip" data-action="project" data-project="" aria-pressed="true">All projects</button>
                         </div>
+                        <div class="select-wrap"><select id="project-select" class="input" aria-labelledby="project-label"><option value="">All projects</option></select></div>
                     </div>
                 </div>
 
@@ -56,13 +57,13 @@
 
                 <!-- Rows are pre-rendered so the page doesn't jump when the data arrives -->
                 <div id="tiers" class="tiers">
-                    <div class="tier"><div class="tier-label tier-S"><span class="tier-badge"><span class="tier-letter">S</span><span class="tier-word">Dream</span></span></div><div class="tier-items is-loading"></div></div>
-                    <div class="tier"><div class="tier-label tier-A"><span class="tier-badge"><span class="tier-letter">A</span><span class="tier-word">Want</span></span></div><div class="tier-items is-loading"></div></div>
-                    <div class="tier"><div class="tier-label tier-B"><span class="tier-badge"><span class="tier-letter">B</span><span class="tier-word">Like</span></span></div><div class="tier-items is-loading"></div></div>
-                    <div class="tier"><div class="tier-label tier-C"><span class="tier-badge"><span class="tier-letter">C</span><span class="tier-word">Maybe</span></span></div><div class="tier-items is-loading"></div></div>
+                    <div class="tier"><div class="tier-label tier-S"><span class="tier-badge"><span class="tier-letter">S</span><span class="tier-word">Dream gift</span></span></div><div class="tier-items is-loading"></div></div>
+                    <div class="tier"><div class="tier-label tier-A"><span class="tier-badge"><span class="tier-letter">A</span><span class="tier-word">Really want</span></span></div><div class="tier-items is-loading"></div></div>
+                    <div class="tier"><div class="tier-label tier-B"><span class="tier-badge"><span class="tier-letter">B</span><span class="tier-word">Would like</span></span></div><div class="tier-items is-loading"></div></div>
+                    <div class="tier"><div class="tier-label tier-C"><span class="tier-badge"><span class="tier-letter">C</span><span class="tier-word">Nice to have</span></span></div><div class="tier-items is-loading"></div></div>
                 </div>
 
-                <p class="list-foot"><button id="toggle-bought" class="text-btn" data-action="toggle-bought" hidden></button></p>
+                <p class="list-foot"><button id="toggle-bought" class="btn btn-quiet" data-action="toggle-bought" hidden></button></p>
             </section>
 
             <section id="admin-view" hidden></section>
